@@ -1,6 +1,6 @@
 # param_util
 
-Utility class for registering and handling updates to ros2 parameters.
+Utility C++ code for registering and handling updates to ROS parameters.
 
 This is a header only library which provides the ParamHandler class.  The
 primary purpose is to reduce boilerplate code related to:
