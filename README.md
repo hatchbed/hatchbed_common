@@ -94,3 +94,8 @@ int main(int argc, char **argv) {
   return 0;
 
 ```
+
+## Future Work:
+ - optional thread safe interfaces
+ - optional per-parameter on-change callbacks
+ - ros1 support
