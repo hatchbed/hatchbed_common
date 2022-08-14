@@ -2,13 +2,6 @@
 
 Utility C++ code for registering and handling updates to ROS parameters.
 
-This is a header only library which provides the ParamHandler class.  The
-primary purpose is to reduce boilerplate code related to:
-  - declaring parameters
-  - defining parameter descriptions
-  - setting up parameters for dynamic update
-  - setting range limits on dynamic parameters
-
 ## Motivation
 
 The functionality and design are similar to [ddynamic_reconfigure](https://github.com/pal-robotics/ddynamic_reconfigure)
@@ -66,10 +59,19 @@ value using the `.value()` method.
 ```
 param_util::ParamHandler params(ros::NodeHandle("~"));
 
+// integer parameter
 int num_tries = params.param("num_tries", 1, "Number of tries").min(1).max(50).value();
+
+// string parameter
 std::string frame_id = params.param("frame_id", std::string("base_link"), "TF frame").value();
+
+// bool parameter
 bool debug = params.param("debug", false, "Enable debug mode").value();
+
+// double parameter
 double threshold = params.param("threshold", 0.75, "Threshold value").min(0.0).max(1.0).value();
+
+// enum parameter
 int mode = params.param("mode", 0, "Operating mode").enumerate({
     {0, "Default", "Default operating mode"},
     {1, "Advanced", "Advanced operating mode"},
