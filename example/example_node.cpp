@@ -17,8 +17,6 @@ int main(int argc, char **argv)
     //
     // Static parameters
     //
-
-    // Specifying the
     int num_tries = params.param("num_tries", 1, "Number of tries").min(1).max(50).value();
     std::string frame_id = params.param("frame_id", std::string("base_link"), "TF frame").value();
     bool debug = params.param("debug", false, "Enable debug mode").value();
