@@ -476,7 +476,7 @@ class ParamHandler {
                     param_min.value = int_param_it->second.min();
                 }
                 else {
-                    param_min.value = -100;
+                    param_min.value = -10000;
                 }
                 description.min.ints.push_back(param_min);
 
@@ -485,7 +485,7 @@ class ParamHandler {
                     param_max.value = int_param_it->second.max();
                 }
                 else {
-                    param_max.value = 100;
+                    param_max.value = 10000;
                 }
                 description.max.ints.push_back(param_max);
 
