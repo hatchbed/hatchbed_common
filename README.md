@@ -140,3 +140,11 @@ while (ros::ok()) {
 ```
 
 These different approaches are not mutually exclusive and can be used in concert.
+
+### Differences Between ROS1 and ROS2
+ - ros2: `.declare()` must be called after configuring a parameter
+ - ros2: there is no `.group()` configuration
+ - ros2: parameters are ordered alphabetically in dynamic_reconfigure
+ - ros2: `.register_verbose_logging_param()` helper function added to enable dynamic parameter for log-devel
+ - ros1: there is no `.step()` configuration for numeric parameters
+ - ros1: parameters are ordered in configuration order in dynamic_reconfigure
