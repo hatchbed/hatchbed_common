@@ -2,100 +2,152 @@
 
 Utility C++ code for registering and handling updates to ROS parameters.
 
-This is a header only library which provides the ParamHandler class.  The
-primary purpose is to reduce boilerplate code related to:
-  - declaring parameters
-  - defining parameter descriptions
-  - setting up parameters for dynamic update
-  - setting range limits on dynamic parameters
-  - adding a 'verbose' parameter to dynamically turn on and off the debug log
-    level
+## Motivation
 
-## Static Parameters
+The functionality and design are similar to [ddynamic_reconfigure](https://github.com/pal-robotics/ddynamic_reconfigure)
+and [swri_roscpp](https://github.com/swri-robotics/marti_common/tree/master/swri_roscpp#dynamic-parameters)
+in that dynamic parameters can be created and managed programatically without
+needing to define a .cfg file.
 
-Static parameters can be registered and loaded with the following function
+The objectives are to:
+  - minimize boilerplate code for defining and accessing parameters
+  - support code clarity when defining parameters
+  - provide a similar interface for both static and dynamic parameters
+  - provide a similar interface for both ros1 and ros2
+  - add minor quality of life improvements like:
+     - logging parameter values at startup and on change
+     - enforcing range constraints
+     - publishing static (readonly) parameters to dynamic reconfig for easier runtime inspection
 
-```
-  /**
-   * Register a non-dynamic parameter and return it's value.
-   *
-   * @param[in] name         Parameter name
-   * @param[in] default_val  Default parameter value
-   * @param[in] description  Parameter description
-   *
-   * @returns the value of the parameter.
-   */
-  template <class T>
-  T ParamHandler::param(const std::string& name, const T& default_val, const std::string& description);
-```
+## API
 
-Even though the parameter is configured to be read only, it will still show up in rqt_reconfigure where the description
-can be accessed as a tooltip.
+The `ParamHandler` is a convenience class for managing static and dynamic ROS 
+parameters.  It will automatically send parameter config description messages
+when new parameters are registered with the handler and will handle receiving
+and sending parameter updates.
 
-## Dynamic Parameters
+Both static and dynamic parameters are included in the config description,
+but static parameters will be labeled as '(readonly)' and prevent any updates
+that might come in for them.
 
-Dynamic parameters can be registered in a similar way, but instead of returning the current value, a pointer to where
-the parameter should be stored is passed in.   ParamHandler will then handled the callbacks for parameter updates and
-update the variable referenced by the pointer.
+### Registering Parameters
 
-Note: ParamHandler assumes single threaded access to the provided parameter storage variable.
+When registering a new parameter the param handler will return a parameter
+object which can be used to access the parameter value in a thread safe way.
 
-```
-  /**
-   * Register a dynamic parameter without any range constraint and populate
-   * the parameter variable with the current value.
-   *
-   * @param[out] param       Reference to parameter variable
-   * @param[in] name         Parameter name
-   * @param[in] default_val  Default parameter value
-   * @param[in] description  Parameter description
-   */
-  template <class T>
-  void register_param(T* param, const std::string& name, const T& default_val, const std::string& description)
-```
+All parameters require a name, default value, and description.
 
-Range constraints can also be specified for `int` and `double` parameters.  See the examples below.
+Optionally, a pointer to an existing variable can be passed in when registering
+a parameter.  In this case that variable is used to store the parameter value, 
+but access to it is not protected, so should only be used in single threaded
+applications.
+ 
+When registering a parameter it is possible to chain additional configuration
+items to the parameter, such as:
+  - `.callback()`: provide a callback function when the parameter changes, implies `.dynamic()`
+  - `.dynamic()`: allow the parameter to by modified with dynamic reconfig
+  - `.enum()`: specify an enumeration for integer parameters
+  - `.max()`: specify a maximum value for numeric parameters
+  - `.min()`: specify a minimun value for numeric parameters
+  - `.step()`: specify a step size for numeric parameters
 
-## Example Usage:
-```
-#include <param_util/param_handler.h>
-#include <rclcpp/rclcpp.hpp>
+Once the parameter has been configured, it's necessary to call the `.declare()` method.
 
-int main(int argc, char **argv) {
+### Static Parameters
 
-  rclcpp::init(argc, argv);
-  auto node = std::make_shared<rclcpp::Node>("node_name");
-  auto params = std::make_shared<param_util::ParamHandler>(node);
-
-  // declare and get static parameters
-  int int_param = params->param("int_param_name", 10, "description of parameter");
-  double double_param = params->param("double_param_name", 10.0, "description of parameter");
-  bool bool_param = params->param("bool_param_name", false, "description of parameter");
-  std::string string_param = params->param("string_param_name", std::string("default"), "description of parameter");
-
-  // register dynamic parameters
-  int dyn_int_param;
-  params->register(&dyn_int_param, "dyn_int_param_name", 55, "description of parameter");
-
-  double dyn_double_param;
-  params->register(&dyn_double_param, "dyn_double_param_name", 0.1, "description of parameter");
-
-  double dyn_bool_param;
-  params->register(&dyn_bool_param, "dyn_bool_param_name", true, "description of parameter");
-
-  // dynamic parameters can have range constraints with min, max, and step parameters
-  int int_range_param;
-  params->register(&int_range_param, "int_range_param_name", 55, "description of parameter", 0, 100, 1);
-
-  double double_range_param;
-  params->register(&double_range_param, "double_range_param_name", 0.1, "description of parameter", -1.0, 1.0, 0.1);
-
-  rclcpp::spin();
-  return 0;
+For static parameters it's generally sufficient to just immediately store the 
+value using the `.value()` method.
 
 ```
+auto node = std::make_shared<rclcpp::Node>("param_util_example");
+param_util::ParamHandler params(node);
 
-## Future Work:
- - optional thread safe interfaces
- - optional per-parameter on-change callbacks
- - ros1 support
+// integer parameter
+int num_tries = params.param("num_tries", 1, "Number of tries").min(1).max(50).declare().value();
+
+// string parameter
+std::string frame_id = params.param("frame_id", std::string("base_link"), "TF frame").declare().value();
+
+// bool parameter
+bool debug = params.param("debug", false, "Enable debug mode").value();
+
+// double parameter
+double threshold = params.param("threshold", 0.75, "Threshold value").min(0.0).max(1.0).declare().value();
+
+// enum parameter
+int mode = params.param("mode", 0, "Operating mode").enumerate({
+    {0, "Default", "Default operating mode"},
+    {1, "Advanced", "Advanced operating mode"},
+    {20, "Legacy", "Legacy operating mode"}}).declare().value();
+```
+
+### Dynamic Parameters
+
+For dynamic parameters, there are several options.
+
+In a single threaded use case it's possible to pass in a pointer to where the 
+parameter should be stored:
+
+```
+int num_tries = 0;
+params.param(&num_tries, "num_tries", 1, "Number of tries").min(1).max(50).dynamic().declare();
+
+while (rclcpp::ok()) {
+    process.execute(num_tries);
+    rclcpp::spin_some(node);
+}
+
+```
+
+Here the `num_tries` int variable will be automatically updated.
+
+When multi-threading is involved the above method is not recommended.  Instead
+the parameter object returned by the handler should be used to ensure thread-safe
+data access.
+
+```
+auto num_tries = params.param("num_tries", 1, "Number of tries").min(1).max(50).dynamic().declare();
+
+std::thread t([&](){
+    while (rclcpp::ok()) {
+        process.execute(num_tries.value());
+    }
+});
+
+rclcpp::spin(node);
+t.join();
+
+```
+
+The different parameter types are:
+  - `param_util::BoolParameter`
+  - `param_util::DoubleParameter`
+  - `param_util::IntParameter`
+  - `param_util::StringParameter`
+
+In addition to accessing the current value, the parameter object can be used to 
+publish an update to the parameter using the `.update()` method.
+
+Finally, in some cases a direct callback may be desired to notify the process
+that the value has changed:
+
+```
+params.param("num_tries", 1, "Number of tries").min(1).max(50).callback([](int value){
+    process.setNumTries(value);
+}).declare();
+
+while (rclcpp::ok()) {
+    process.exectute();
+    rclcpp::spin_some(node);
+}
+```
+
+These different approaches are not mutually exclusive and can be used in concert.
+
+### Differences Between ROS1 and ROS2
+ - ros2: `.declare()` must be called after configuring a parameter
+ - ros2: there is no `.group()` configuration
+ - ros2: parameters are ordered alphabetically in dynamic_reconfigure
+ - ros2: `.register_verbose_logging_param()` helper function added to enable dynamic parameter for log-devel
+ - ros1: there is no `.step()` configuration for numeric parameters
+ - ros1: parameters are ordered in configuration order in dynamic_reconfigure
