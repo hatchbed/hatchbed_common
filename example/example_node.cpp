@@ -21,10 +21,6 @@ int main(int argc, char **argv)
     std::string frame_id = params.param("frame_id", std::string("base_link"), "TF frame").value();
     bool debug = params.param("debug", false, "Enable debug mode").value();
     double threshold = params.param("threshold", 0.75, "Threshold value").min(0.0).max(1.0).value();
-    int mode = params.param("mode", 0, "Operating mode").enumerate({
-        {0, "Default", "Default operating mode"},
-        {1, "Advanced", "Advanced operating mode"},
-        {20, "Legacy", "Legacy operating mode"}}).value();
 
     // Sub-grouped
     double coeff_a = params.param("coeff_a", 1.0, "Coefficient A").group("internal").min(0.0).max(1.0).value();
@@ -35,9 +31,15 @@ int main(int argc, char **argv)
     // Dynamic parameters
     //
     auto enable_feedback = params.param("enable_feedback", false, "Enable feedback").dynamic();
-    auto target_exposure = params.param("exposure", 2000.0, "Exposure (microseconds)").min(0.0).max(1000.0).callback([](double value){
+    int mode = params.param("mode", 0, "Operating mode").enumerate({
+        {0, "Default", "Default operating mode"},
+        {1, "Advanced", "Advanced operating mode"},
+        {20, "Legacy", "Legacy operating mode"}}).dynamic().value();
+    auto target_exposure = params.param("exposure", 2000.0, "Exposure (microseconds)").min(0.0).max(10000.0).callback([](double value){
         ROS_INFO("Handling change in exposure parameter.  New value is: %lf microseconds", value);
     });
+
+    target_exposure.update(500);
 
     ros::Timer timer = priv.createTimer(ros::Duration(1.0), [&](const ros::TimerEvent& e){
         if (enable_feedback.value()) {

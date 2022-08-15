@@ -31,12 +31,12 @@
 
 #pragma once
 
-#include <functional>
 #include <memory>
 #include <mutex>
 #include <sstream>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 
 #include <dynamic_reconfigure/Config.h>
 #include <dynamic_reconfigure/ConfigDescription.h>
@@ -113,11 +113,17 @@ class ParamHandler {
      */
     BoolParameter& param(const std::string& name, const bool& default_val, const std::string& description) {
         std::scoped_lock lock(mutex_);
-        bool_params_[name] = BoolParameter(nullptr, node_.getNamespace(), name, default_val, description);
 
+        if (registered_.count(name) != 0) {
+            throw std::runtime_error("Parameter [" + name + "] already registered.");
+        }
+        registered_.insert(name);
+
+        bool_params_[name] = BoolParameter(nullptr, node_.getNamespace(), name, default_val, description);
         bool value = node_.param(name, default_val);
         bool_params_[name].update(value);
         bool_params_[name].setPublishCallback([this](const std::string& name){ publishUpdate(name); });
+        bool_params_[name].setConfigChangeCallback([this](const std::string& name){ descriptionChanged(); });
         param_order_.push_back(name);
 
         std::string resolved = node_.resolveName(name);
@@ -133,6 +139,8 @@ class ParamHandler {
      * NOTE: This version is only recommended for single threaded applications since the user provided parameter
      *       pointer won't be fully guarded from concurrent usage.
      *
+     *       The pointer should also remain valid for the life of the handler.
+     *
      * @param[out] param       Reference to parameter variable
      * @param[in] name         Parameter name
      * @param[in] default_val  Default parameter value
@@ -142,11 +150,17 @@ class ParamHandler {
      */
     BoolParameter& param(bool* param, const std::string& name, const bool& default_val, const std::string& description) {
         std::scoped_lock lock(mutex_);
-        bool_params_[name] = BoolParameter(param, node_.getNamespace(), name, default_val, description);
 
+        if (registered_.count(name) != 0) {
+            throw std::runtime_error("Parameter [" + name + "] already registered.");
+        }
+        registered_.insert(name);
+
+        bool_params_[name] = BoolParameter(param, node_.getNamespace(), name, default_val, description);
         bool value = node_.param(name, default_val);
         bool_params_[name].update(value);
         bool_params_[name].setPublishCallback([this](const std::string& name){ publishUpdate(name); });
+        bool_params_[name].setConfigChangeCallback([this](const std::string& name){ descriptionChanged(); });
         param_order_.push_back(name);
 
         std::string resolved = node_.resolveName(name);
@@ -157,7 +171,7 @@ class ParamHandler {
     }
 
     /**
-     * Register an int parameter and return it's value.
+     * Register an integer parameter and return it's value.
      *
      * @param[in] name         Parameter name
      * @param[in] default_val  Default parameter value
@@ -167,11 +181,17 @@ class ParamHandler {
      */
     IntParameter& param(const std::string& name, const int& default_val, const std::string& description) {
         std::scoped_lock lock(mutex_);
-        int_params_[name] = IntParameter(nullptr, node_.getNamespace(), name, default_val, description);
 
+        if (registered_.count(name) != 0) {
+            throw std::runtime_error("Parameter [" + name + "] already registered.");
+        }
+        registered_.insert(name);
+
+        int_params_[name] = IntParameter(nullptr, node_.getNamespace(), name, default_val, description);
         int value = node_.param(name, default_val);
         int_params_[name].update(value);
         int_params_[name].setPublishCallback([this](const std::string& name){ publishUpdate(name); });
+        int_params_[name].setConfigChangeCallback([this](const std::string& name){ descriptionChanged(); });
         param_order_.push_back(name);
 
         std::string resolved = node_.resolveName(name);
@@ -182,10 +202,12 @@ class ParamHandler {
     }
 
     /**
-     * Register an int parameter and return it's value.
+     * Register an integer parameter and return it's value.
      *
      * NOTE: This version is only recommended for single threaded applications since the user provided parameter
      *       pointer won't be fully guarded from concurrent usage.
+     *
+     *       The pointer should also remain valid for the life of the handler.
      *
      * @param[out] param       Reference to parameter variable
      * @param[in] name         Parameter name
@@ -196,11 +218,17 @@ class ParamHandler {
      */
     IntParameter& param(int* param, const std::string& name, const int& default_val, const std::string& description) {
         std::scoped_lock lock(mutex_);
-        int_params_[name] = IntParameter(param, node_.getNamespace(), name, default_val, description);
 
+        if (registered_.count(name) != 0) {
+            throw std::runtime_error("Parameter [" + name + "] already registered.");
+        }
+        registered_.insert(name);
+
+        int_params_[name] = IntParameter(param, node_.getNamespace(), name, default_val, description);
         int value = node_.param(name, default_val);
         int_params_[name].update(value);
         int_params_[name].setPublishCallback([this](const std::string& name){ publishUpdate(name); });
+        int_params_[name].setConfigChangeCallback([this](const std::string& name){ descriptionChanged(); });
         param_order_.push_back(name);
 
         std::string resolved = node_.resolveName(name);
@@ -221,11 +249,17 @@ class ParamHandler {
      */
     DoubleParameter& param(const std::string& name, const double& default_val, const std::string& description) {
         std::scoped_lock lock(mutex_);
-        double_params_[name] = DoubleParameter(nullptr, node_.getNamespace(), name, default_val, description);
 
+        if (registered_.count(name) != 0) {
+            throw std::runtime_error("Parameter [" + name + "] already registered.");
+        }
+        registered_.insert(name);
+
+        double_params_[name] = DoubleParameter(nullptr, node_.getNamespace(), name, default_val, description);
         double value = node_.param(name, default_val);
         double_params_[name].update(value);
         double_params_[name].setPublishCallback([this](const std::string& name){ publishUpdate(name); });
+        double_params_[name].setConfigChangeCallback([this](const std::string& name){ descriptionChanged(); });
         param_order_.push_back(name);
 
         std::string resolved = node_.resolveName(name);
@@ -241,6 +275,8 @@ class ParamHandler {
      * NOTE: This version is only recommended for single threaded applications since the user provided parameter
      *       pointer won't be fully guarded from concurrent usage.
      *
+     *       The pointer should also remain valid for the life of the handler.
+     *
      * @param[out] param       Reference to parameter variable
      * @param[in] name         Parameter name
      * @param[in] default_val  Default parameter value
@@ -250,11 +286,17 @@ class ParamHandler {
      */
     DoubleParameter& param(double* param, const std::string& name, const double& default_val, const std::string& description) {
         std::scoped_lock lock(mutex_);
-        double_params_[name] = DoubleParameter(param, node_.getNamespace(), name, default_val, description);
 
+        if (registered_.count(name) != 0) {
+            throw std::runtime_error("Parameter [" + name + "] already registered.");
+        }
+        registered_.insert(name);
+
+        double_params_[name] = DoubleParameter(param, node_.getNamespace(), name, default_val, description);
         double value = node_.param(name, default_val);
         double_params_[name].update(value);
         double_params_[name].setPublishCallback([this](const std::string& name){ publishUpdate(name); });
+        double_params_[name].setConfigChangeCallback([this](const std::string& name){ descriptionChanged(); });
         param_order_.push_back(name);
 
         std::string resolved = node_.resolveName(name);
@@ -275,11 +317,17 @@ class ParamHandler {
      */
     StringParameter& param(const std::string& name, const std::string& default_val, const std::string& description) {
         std::scoped_lock lock(mutex_);
-        string_params_[name] = StringParameter(nullptr, node_.getNamespace(), name, default_val, description);
 
+        if (registered_.count(name) != 0) {
+            throw std::runtime_error("Parameter [" + name + "] already registered.");
+        }
+        registered_.insert(name);
+
+        string_params_[name] = StringParameter(nullptr, node_.getNamespace(), name, default_val, description);
         std::string value = node_.param(name, default_val);
         string_params_[name].update(value);
         string_params_[name].setPublishCallback([this](const std::string& name){ publishUpdate(name); });
+        string_params_[name].setConfigChangeCallback([this](const std::string& name){ descriptionChanged(); });
         param_order_.push_back(name);
 
         std::string resolved = node_.resolveName(name);
@@ -295,6 +343,8 @@ class ParamHandler {
      * NOTE: This version is only recommended for single threaded applications since the user provided parameter
      *       pointer won't be fully guarded from concurrent usage.
      *
+     *       The pointer should also remain valid for the life of the handler.
+     *
      * @param[out] param       Reference to parameter variable
      * @param[in] name         Parameter name
      * @param[in] default_val  Default parameter value
@@ -304,11 +354,17 @@ class ParamHandler {
      */
     StringParameter& param(std::string* param, const std::string& name, const std::string& default_val, const std::string& description) {
         std::scoped_lock lock(mutex_);
-        string_params_[name] = StringParameter(param, node_.getNamespace(), name, default_val, description);
 
+        if (registered_.count(name) != 0) {
+            throw std::runtime_error("Parameter [" + name + "] already registered.");
+        }
+        registered_.insert(name);
+
+        string_params_[name] = StringParameter(param, node_.getNamespace(), name, default_val, description);
         std::string value = node_.param(name, default_val);
         string_params_[name].update(value);
         string_params_[name].setPublishCallback([this](const std::string& name){ publishUpdate(name); });
+        string_params_[name].setConfigChangeCallback([this](const std::string& name){ descriptionChanged(); });
         param_order_.push_back(name);
 
         std::string resolved = node_.resolveName(name);
@@ -689,6 +745,11 @@ class ParamHandler {
         values_changed_ = true;
     }
 
+    void descriptionChanged() {
+        std::scoped_lock lock(mutex_);
+        description_changed_ = true;
+    }
+
     static std::string getEditMethod(const IntParameter& param) {
         if (param.enums().empty()) {
             return {};
@@ -736,6 +797,7 @@ class ParamHandler {
     ros::Publisher update_pub_;
 
     std::vector<std::string> param_order_;
+    std::unordered_set<std::string> registered_;
     std::vector<dynamic_reconfigure::GroupState> group_states_;
     std::unordered_map<std::string, BoolParameter> bool_params_;
     std::unordered_map<std::string, DoubleParameter> double_params_;

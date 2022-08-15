@@ -34,6 +34,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -80,6 +81,7 @@ class Parameter {
         }
         else {
             borrowed_store_ = std::make_shared<BorrowedStore<T>>(store);
+            *(borrowed_store_->value) = default_val_;
         }
     }
 
@@ -87,19 +89,22 @@ class Parameter {
     Parameter(const Parameter& parameter) = default;
     virtual ~Parameter() = default;
 
-    Parameter<T>& group(const std::string& group) {
+    virtual Parameter<T>& group(const std::string& group) {
         group_ = group;
+        configChanged();
         return *this;
     }
 
-    Parameter<T>& callback(std::function<void(T)> callback) {
+    virtual Parameter<T>& callback(std::function<void(T)> callback) {
         is_dynamic_ = true;
         user_callback_ = callback;
+        configChanged();
         return *this;
     }
 
-    Parameter<T>& dynamic() {
+    virtual Parameter<T>& dynamic() {
         is_dynamic_ = true;
+        configChanged();
         return *this;
     }
 
@@ -140,10 +145,14 @@ class Parameter {
         publish_callback_ = callback;
     }
 
-    virtual void update(const T& value, bool from_callback = false) {
+    void setConfigChangeCallback(std::function<void(const std::string&)> callback) {
+        config_change_callback_ = callback;
+    }
+
+    virtual bool update(const T& value, bool from_callback = false) {
         // don't update if this is from a callback and not a dynamic parameter
         if (from_callback && !is_dynamic_) {
-            return;
+            return false;
         }
 
         bool did_change = false;
@@ -151,8 +160,8 @@ class Parameter {
             std::scoped_lock lock(owned_store_->mutex);
             did_change = owned_store_->value != value;
             if (did_change && from_callback) {
-                ROS_INFO_STREAM("updated <" << namespace_ << "/" << name_ << ">: " << owned_store_->value
-                    << altText(owned_store_->value) << " to " << value << altText(value));
+                ROS_INFO_STREAM("updated <" << namespace_ << "/" << name_ << ">: " << toString(owned_store_->value)
+                    << " to " << toString(value));
             }
             owned_store_->value = value;
         }
@@ -160,8 +169,8 @@ class Parameter {
             std::scoped_lock lock(borrowed_store_->mutex);
             did_change = *borrowed_store_->value != value;
             if (did_change && from_callback) {
-                ROS_INFO_STREAM("updated <" << namespace_ << "/" << name_ << ">: " << *borrowed_store_->value
-                    << altText(*borrowed_store_->value) <<" to " << value << altText(value));
+                ROS_INFO_STREAM("updated <" << namespace_ << "/" << name_ << ">: " << toString(*borrowed_store_->value)
+                    <<" to " << toString(value));
             }
             *borrowed_store_->value = value;
         }
@@ -173,11 +182,21 @@ class Parameter {
         if (user_callback_ && did_change) {
             user_callback_(value);
         }
+
+        return true;
     }
 
     protected:
-    virtual std::string altText(const T& value) const {
-        return {};
+    virtual std::string toString(const T& value) const {
+        std::stringstream ss;
+        ss << value;
+        return ss.str();
+    }
+
+    void configChanged() {
+        if (config_change_callback_) {
+            config_change_callback_(name_);
+        }
     }
 
     std::string namespace_;
@@ -191,6 +210,7 @@ class Parameter {
     bool is_dynamic_ = false;
     std::function<void(T)> user_callback_;
     std::function<void(const std::string&)> publish_callback_;
+    std::function<void(const std::string&)> config_change_callback_;
 };
 
 class BoolParameter : public Parameter<bool> {
@@ -203,11 +223,11 @@ class BoolParameter : public Parameter<bool> {
     virtual ~BoolParameter() = default;
 
     protected:
-    virtual std::string altText(const bool& value) const {
+    virtual std::string toString(const bool& value) const override {
         if (value) {
-            return " (true)";
+            return "true";
         }
-        return " (false)";
+        return "false";
     }
 };
 
@@ -221,32 +241,51 @@ class NumericParameter : public Parameter<T> {
     NumericParameter(const NumericParameter& parameter) = default;
     virtual ~NumericParameter() = default;
 
-    NumericParameter<T>& group(const std::string& group) {
+    virtual NumericParameter<T>& group(const std::string& group) override {
         Parameter<T>::group(group);
         return *this;
     }
 
-    NumericParameter<T>& callback(std::function<void(T)> callback) {
+    virtual NumericParameter<T>& callback(std::function<void(T)> callback) override {
         Parameter<T>::callback(callback);
         return *this;
     }
 
-    NumericParameter<T>& dynamic() {
+    virtual NumericParameter<T>& dynamic() override {
         Parameter<T>::dynamic();
         return *this;
     }
 
-    NumericParameter<T>& min(T min) {
+    virtual NumericParameter<T>& min(T min) {
         min_ = min;
         has_min_ = true;
-        update(clamp(Parameter<T>::value()));
+        if (max_ < min_) {
+            max_ = min_;
+        }
+        T clamped = clamp(Parameter<T>::value());
+        if (clamped != Parameter<T>::value()) {
+            ROS_INFO_STREAM("clamped <" << this->namespace_ << "/" << this->name_ << ">: " << this->toString(Parameter<T>::value())
+                <<" to " << this->toString(clamped));
+            update(clamped);
+        }
+        this->configChanged();
         return *this;
     }
 
-    NumericParameter<T>& max(T max) {
+    virtual NumericParameter<T>& max(T max) {
         max_ = max;
         has_max_ = true;
-        update(clamp(Parameter<T>::value()));
+        if (min_ > max_) {
+            min_ = max_;
+        }
+
+        T clamped = clamp(Parameter<T>::value());
+        if (clamped != Parameter<T>::value()) {
+            ROS_INFO_STREAM("clamped <" << this->namespace_ << "/" << this->name_ << ">: " << this->toString(Parameter<T>::value())
+                <<" to " << this->toString(clamped));
+            update(clamped);
+        }
+        this->configChanged();
         return *this;
     }
 
@@ -275,23 +314,23 @@ class NumericParameter : public Parameter<T> {
         T clamped = value;
 
         if (has_min_ && clamped < min_) {
-            clamped == min_;
+            clamped = min_;
         }
         if (has_max_ && clamped > max_) {
-            clamped == max_;
+            clamped = max_;
         }
 
         return clamped;
     }
 
-    virtual void update(const T& value, bool from_callback = false) {
+    virtual bool update(const T& value, bool from_callback = false) override {
         T clamped = clamp(value);
-        Parameter<T>::update(clamped, from_callback);
+        return Parameter<T>::update(clamped, from_callback);
     }
 
     protected:
-    T min_;
-    T max_;
+    T min_ = -10000;
+    T max_ = 10000;
     bool has_max_ = false;
     bool has_min_ = false;
 };
@@ -305,33 +344,38 @@ class IntParameter : public NumericParameter<int> {
     IntParameter(const IntParameter& parameter) = default;
     virtual ~IntParameter() = default;
 
-    IntParameter& group(const std::string& group) {
+    virtual IntParameter& group(const std::string& group) override {
         NumericParameter<int>::group(group);
         return *this;
     }
 
-    IntParameter& callback(std::function<void(int)> callback) {
+    virtual IntParameter& callback(std::function<void(int)> callback) override {
         NumericParameter<int>::callback(callback);
         return *this;
     }
 
-    IntParameter& dynamic() {
+    virtual IntParameter& dynamic() override {
         NumericParameter<int>::dynamic();
         return *this;
     }
 
-    IntParameter& min(int min) {
-        NumericParameter<int>::min(min);
+    virtual IntParameter& min(int min) override {
+        if (enums_.empty()) {
+            NumericParameter<int>::min(min);
+        }
         return *this;
     }
 
-    IntParameter& max(int max) {
-        NumericParameter<int>::max(max);
+    virtual IntParameter& max(int max) override {
+        if (enums_.empty()) {
+            NumericParameter<int>::max(max);
+        }
         return *this;
     }
 
-    IntParameter& enumerate(const std::vector<EnumOption>& enums) {
+    virtual IntParameter& enumerate(const std::vector<EnumOption>& enums) {
         enums_ = enums;
+        configChanged();
         return *this;
     }
 
@@ -351,10 +395,9 @@ class IntParameter : public NumericParameter<int> {
         return enums_;
     }
 
-    virtual void update(const int& value, bool from_callback = false) {
+    virtual bool update(const int& value, bool from_callback = false) override {
         if (enums_.empty()) {
-            NumericParameter<int>::update(value, from_callback);
-            return;
+            return NumericParameter<int>::update(value, from_callback);
         }
 
         bool valid = false;
@@ -366,13 +409,14 @@ class IntParameter : public NumericParameter<int> {
         }
 
         if (valid) {
-            Parameter<int>::update(value, from_callback);
+            return Parameter<int>::update(value, from_callback);
         }
+
+        return false;
     }
 
     protected:
-    protected:
-    virtual std::string altText(const int& value) const {
+    virtual std::string toString(const int& value) const override {
         for (const auto& option: enums_) {
             if (option.value == value) {
                 return " (" + option.name + ")";
@@ -383,6 +427,11 @@ class IntParameter : public NumericParameter<int> {
 
     std::vector<EnumOption> enums_;
 };
+
+template class Parameter<bool>;
+template class Parameter<std::string>;
+template class NumericParameter<int>;
+template class NumericParameter<double>;
 
 typedef Parameter<std::string> StringParameter;
 typedef NumericParameter<double> DoubleParameter;
