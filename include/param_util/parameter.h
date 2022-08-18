@@ -159,7 +159,7 @@ class Parameter {
         if (owned_store_) {
             std::scoped_lock lock(owned_store_->mutex);
             did_change = owned_store_->value != value;
-            if (did_change && from_callback) {
+            if (did_change) {
                 ROS_INFO_STREAM("updated <" << namespace_ << "/" << name_ << ">: " << toString(owned_store_->value)
                     << " to " << toString(value));
             }
@@ -168,7 +168,7 @@ class Parameter {
         else {
             std::scoped_lock lock(borrowed_store_->mutex);
             did_change = *borrowed_store_->value != value;
-            if (did_change && from_callback) {
+            if (did_change) {
                 ROS_INFO_STREAM("updated <" << namespace_ << "/" << name_ << ">: " << toString(*borrowed_store_->value)
                     <<" to " << toString(value));
             }
@@ -221,6 +221,25 @@ class BoolParameter : public Parameter<bool> {
     BoolParameter() = default;
     BoolParameter(const BoolParameter& parameter) = default;
     virtual ~BoolParameter() = default;
+
+    virtual BoolParameter& group(const std::string& group) override {
+        Parameter<bool>::group(group);
+        return *this;
+    }
+
+    virtual BoolParameter& callback(std::function<void(bool)> callback) override {
+        Parameter<bool>::callback(callback);
+        return *this;
+    }
+
+    virtual BoolParameter& dynamic() override {
+        Parameter<bool>::dynamic();
+        return *this;
+    }
+
+    std::string group() const {
+        return Parameter<bool>::group();
+    }
 
     protected:
     virtual std::string toString(const bool& value) const override {
@@ -419,10 +438,10 @@ class IntParameter : public NumericParameter<int> {
     virtual std::string toString(const int& value) const override {
         for (const auto& option: enums_) {
             if (option.value == value) {
-                return " (" + option.name + ")";
+                return std::to_string(value) + " (" + option.name + ")";
             }
         }
-        return {};
+        return std::to_string(value);
     }
 
     std::vector<EnumOption> enums_;
