@@ -94,13 +94,65 @@ class ParamHandler {
     ParamHandler(ros::NodeHandle node) :
       node_(node)
     {
-        description_pub_ = node_.advertise<dynamic_reconfigure::ConfigDescription>("parameter_descriptions", 1, true);
-        update_pub_ = node_.advertise<dynamic_reconfigure::Config>("parameter_updates", 1, true);
+        description_pub_ = std::make_shared<ros::Publisher>(
+            node_.advertise<dynamic_reconfigure::ConfigDescription>("parameter_descriptions", 1, true));
+        update_pub_ = std::make_shared<ros::Publisher>(
+            node_.advertise<dynamic_reconfigure::Config>("parameter_updates", 1, true));
         config_service_ = node_.advertiseService("set_parameters", &ParamHandler::configCallback, this);
         description_timer_ = node_.createWallTimer(ros::WallDuration(0.1), &ParamHandler::publishDescription, this);
     };
 
     ~ParamHandler() = default;
+
+    void shutdown() {
+        description_timer_.stop();
+        config_service_.shutdown();
+        update_pub_ = {};
+        description_pub_ = {};
+    }
+
+    bool hasBool(const std::string& name) {
+        return bool_params_.count(name) > 0;
+    }
+
+    bool getBool(const std::string& name) {
+        auto bool_param_it = bool_params_.find(name);
+        if (bool_param_it == bool_params_.end()) {
+            return false;
+        }
+
+        return bool_param_it->second.value();
+    }
+
+    bool hasDouble(const std::string& name) {
+        return double_params_.count(name) > 0;
+    }
+
+    double getDouble(const std::string& name) {
+        auto double_param_it = double_params_.find(name);
+        if (double_param_it == double_params_.end()) {
+            return std::numeric_limits<double>::quiet_NaN();
+        }
+
+        return double_param_it->second.value();
+    }
+
+    bool hasInteger(const std::string& name) {
+        return int_params_.count(name) > 0;
+    }
+
+    int getInteger(const std::string& name) {
+        auto int_param_it = int_params_.find(name);
+        if (int_param_it == int_params_.end()) {
+            return 0;
+        }
+
+        return int_param_it->second.value();
+    }
+
+    bool hasString(const std::string& name) {
+        return string_params_.count(name) > 0;
+    }
 
     /**
      * Register a bool parameter and return it's value.
@@ -378,6 +430,11 @@ class ParamHandler {
     void publishDescription(const ros::WallTimerEvent& e) {
         std::scoped_lock lock(mutex_);
 
+        if (!description_pub_) {
+            ROS_WARN("Description publisher has been shutdown.");
+            return;
+        }
+
         if (!description_changed_) {
             if (values_changed_) {
                 publishUpdate();
@@ -639,7 +696,7 @@ class ParamHandler {
         }
 
         group_states_ = description.dflt.groups;
-        description_pub_.publish(description);
+        description_pub_->publish(description);
 
         publishUpdate();
 
@@ -703,6 +760,11 @@ class ParamHandler {
     }
 
     void publishUpdate() {
+        if (!update_pub_) {
+            ROS_WARN("Update publisher has been shutdown.");
+            return;
+        }
+
         ROS_DEBUG("sending param update");
         dynamic_reconfigure::Config config;
 
@@ -735,7 +797,7 @@ class ParamHandler {
         }
 
         config.groups = group_states_;
-        update_pub_.publish(config);
+        update_pub_->publish(config);
 
         values_changed_ = false;
     }
@@ -793,8 +855,8 @@ class ParamHandler {
 
     ros::WallTimer description_timer_;
     ros::ServiceServer config_service_;
-    ros::Publisher description_pub_;
-    ros::Publisher update_pub_;
+    std::shared_ptr<ros::Publisher> description_pub_;
+    std::shared_ptr<ros::Publisher> update_pub_;
 
     std::vector<std::string> param_order_;
     std::unordered_set<std::string> registered_;
