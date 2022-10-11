@@ -35,11 +35,11 @@
 #include <string>
 #include <unordered_map>
 
-#include <param_util/parameter.h>
+#include <hatchbed_common/parameter.h>
 #include <rclcpp/rclcpp.hpp>
 #include <rcutils/logging.h>
 
-namespace param_util {
+namespace hatchbed_common {
 
 /**
  * The param handler is a convenience class for managing static and dynamic ROS
@@ -329,4 +329,4 @@ private:
   }
 };
 
-}  // param_util
+}  // hatchbed_common

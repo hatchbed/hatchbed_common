@@ -1,8 +1,8 @@
-# param_util
+# hatchbed_common
 
-Utility C++ code for registering and handling updates to ROS parameters.
+Common Hatchbed C++ utility code for ROS, such registering and handling updates to ros parameters.
 
-## Motivation
+## Param Handler
 
 The functionality and design are similar to [ddynamic_reconfigure](https://github.com/pal-robotics/ddynamic_reconfigure)
 and [swri_roscpp](https://github.com/swri-robotics/marti_common/tree/master/swri_roscpp#dynamic-parameters)
@@ -19,7 +19,7 @@ The objectives are to:
      - enforcing range constraints
      - publishing static (readonly) parameters to dynamic reconfig for easier runtime inspection
 
-## API
+### API
 
 The `ParamHandler` is a convenience class for managing static and dynamic ROS 
 parameters.  It will automatically send parameter config description messages
@@ -30,7 +30,7 @@ Both static and dynamic parameters are included in the config description,
 but static parameters will be labeled as '(readonly)' and prevent any updates
 that might come in for them.
 
-### Registering Parameters
+#### Registering Parameters
 
 When registering a new parameter the param handler will return a parameter
 object which can be used to access the parameter value in a thread safe way.
@@ -53,14 +53,14 @@ items to the parameter, such as:
 
 Once the parameter has been configured, it's necessary to call the `.declare()` method.
 
-### Static Parameters
+#### Static Parameters
 
 For static parameters it's generally sufficient to just immediately store the 
 value using the `.value()` method.
 
 ```
-auto node = std::make_shared<rclcpp::Node>("param_util_example");
-param_util::ParamHandler params(node);
+auto node = std::make_shared<rclcpp::Node>("param_handler_example");
+hatchbed_common::ParamHandler params(node);
 
 // integer parameter
 int num_tries = params.param("num_tries", 1, "Number of tries").min(1).max(50).declare().value();
@@ -81,7 +81,7 @@ int mode = params.param("mode", 0, "Operating mode").enumerate({
     {20, "Legacy", "Legacy operating mode"}}).declare().value();
 ```
 
-### Dynamic Parameters
+#### Dynamic Parameters
 
 For dynamic parameters, there are several options.
 
@@ -120,10 +120,10 @@ t.join();
 ```
 
 The different parameter types are:
-  - `param_util::BoolParameter`
-  - `param_util::DoubleParameter`
-  - `param_util::IntParameter`
-  - `param_util::StringParameter`
+  - `hatchbed_common::BoolParameter`
+  - `hatchbed_common::DoubleParameter`
+  - `hatchbed_common::IntParameter`
+  - `hatchbed_common::StringParameter`
 
 In addition to accessing the current value, the parameter object can be used to 
 publish an update to the parameter using the `.update()` method.
@@ -144,7 +144,7 @@ while (rclcpp::ok()) {
 
 These different approaches are not mutually exclusive and can be used in concert.
 
-### Differences Between ROS1 and ROS2
+#### Differences Between ROS1 and ROS2
  - ros2: `.declare()` must be called after configuring a parameter
  - ros2: there is no `.group()` configuration
  - ros2: parameters are ordered alphabetically in dynamic_reconfigure
