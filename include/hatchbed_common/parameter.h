@@ -41,7 +41,7 @@
 
 #include <ros/ros.h>
 
-namespace param_util {
+namespace hatchbed_common {
 
 template <class T>
 struct OwnedStore {
@@ -455,4 +455,4 @@ template class NumericParameter<double>;
 typedef Parameter<std::string> StringParameter;
 typedef NumericParameter<double> DoubleParameter;
 
-}  // namespace param_util
+}  // namespace hatchbed_common

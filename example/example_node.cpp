@@ -1,18 +1,18 @@
 #include <chrono>
 #include <string>
 
-#include <param_util/param_handler.h>
+#include <hatchbed_common/param_handler.h>
 #include <ros/ros.h>
 
 int main(int argc, char **argv)
 {
-    ros::init(argc, argv, "param_util_example");
+    ros::init(argc, argv, "hatchbed_common_example");
     ros::NodeHandle priv("~");
 
     // The param handler needs to be initialized with a private node handle to
     // correctly namespace the dynamic reconfig topics.  It's also possible to
     // provide a handle to sub-namespaces of the private namespace.
-    param_util::ParamHandler params(priv);
+    hatchbed_common::ParamHandler params(priv);
 
     //
     // Static parameters

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(param_util)
+project(hatchbed_common)
 
 find_package(catkin REQUIRED COMPONENTS
   dynamic_reconfigure

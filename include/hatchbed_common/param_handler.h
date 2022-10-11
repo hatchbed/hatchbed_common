@@ -42,10 +42,10 @@
 #include <dynamic_reconfigure/ConfigDescription.h>
 #include <dynamic_reconfigure/GroupState.h>
 #include <dynamic_reconfigure/Reconfigure.h>
-#include <param_util/parameter.h>
+#include <hatchbed_common/parameter.h>
 #include <ros/node_handle.h>
 
-namespace param_util {
+namespace hatchbed_common {
 
 /**
  * The param handler is a convenience class for managing static and dynamic ROS
@@ -867,4 +867,4 @@ class ParamHandler {
     std::unordered_map<std::string, StringParameter> string_params_;
 };
 
-}  // param_util
+}  // hatchbed_common
