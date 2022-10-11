@@ -1,7 +1,7 @@
 #include <chrono>
 #include <string>
 
-#include <param_util/param_handler.h>
+#include <hatchbed_common/param_handler.h>
 #include <rclcpp/rclcpp.hpp>
 #include <rcutils/logging.h>
 
@@ -10,10 +10,10 @@ using namespace std::chrono_literals;
 int main(int argc, char **argv)
 {
     rclcpp::init(argc, argv);
-    auto node = std::make_shared<rclcpp::Node>("param_util_example");
+    auto node = std::make_shared<rclcpp::Node>("param_handler_example");
 
     // The param handler needs to be initialized with a node handle
-    param_util::ParamHandler params(node);
+    hatchbed_common::ParamHandler params(node);
 
     // add 'verbose' dynamic parameter to handle enabling debug log level
     params.register_verbose_logging_param();
