@@ -160,3 +160,81 @@ These different approaches are not mutually exclusive and can be used in concert
  - ros2: `.register_verbose_logging_param()` helper function added to enable dynamic parameter for log-devel
  - ros1: there is no `.step()` configuration for numeric parameters
  - ros1: parameters are ordered in configuration order in dynamic_reconfigure
+
+ ## Simple Profiler
+
+ The `simple_profiler.h` header file provides a simple, low overhead, time profiling utility.
+
+ ```
+
+// enable/disable profiling.
+::profile::set_enabled(true);
+
+// start a new named scope at current level
+profile_scope("new_scope");
+
+// do work
+
+// open a new scope layer
+::profile::push();
+
+// start a child scope
+profile_scope("child_scope1");
+
+// do work
+
+// start a second child scope, stopping previous scope: "child_scope1".
+profile_scope("child_scope2");
+
+// do work
+
+// close the current scope layer, stopping any open child scope
+::profile::pop();
+
+// do work
+
+// start a new scope, stopping "new_scope".
+profile_scope("new_scope2");
+
+// do work
+
+// close any open scopes and increment count
+::profile::finalize();
+
+// print timings
+std::cout << ::profile::get();
+ ```
+
+Profile scopes will stop automatically when:
+ - going out of the scope they were executed in
+ - a new scope on the same level is opened
+ - the current scope level is closed with a `::profile::pop()`
+ - `::profile::finalize()` is called
+
+Calling `::profile::finalize()` will increment the timing count for tracking the average timings
+over multiple iterations.
+
+Calling `::profile::set_enabled(true)` can dynamically enabled or disable the profiling, though
+even with disabled a single comparison is made in each call to check the state of this flag. Most of
+this small overhead can be removed by setting the `-DPROFILE_DISABLED` compiler flag.
+
+Profiling is performed in a thread_local manner, so it is thread-safe, but timings aren't
+aggregated across threads.
+
+The timing profile is stream formatted like this:
+
+```
+timing profile (ms)   elapsed     avg
+=====================================
+handle_points ........ 282.22  239.91
+| get_transforms ....... 0.05    0.05
+| transform ............ 2.33    2.24
+| fit ................ 279.70  237.48
+| | sample ............. 3.21    3.07
+| | index .............. 3.53    3.16
+| | init ............... 0.41    0.35
+| | setup ............. 28.05   25.90
+| |_solve ............ 205.69  168.50
+|_publish .............. 0.01    0.01
+
+```
