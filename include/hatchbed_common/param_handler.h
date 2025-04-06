@@ -263,12 +263,17 @@ class ParamHandler {
         return string_params_[name];
     }
 
+    void setCallback(std::function<void()> callback) {
+        user_callback_ = callback;
+    }
+
 private:
   rclcpp::Node::SharedPtr node_;
   std::string namespace_;
   bool verbose_param_;
   int non_verbose_level_ = RCUTILS_LOG_SEVERITY_INFO;
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr params_callback_handle_;
+  std::function<void()> user_callback_;
 
   std::mutex mutex_;
   std::unordered_map<std::string, BoolParameter> bool_params_;
@@ -319,6 +324,10 @@ private:
                 }
             }
         }
+    }
+
+    if (user_callback_) {
+        user_callback_();
     }
 
     if (!result.successful) {

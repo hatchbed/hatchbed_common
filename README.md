@@ -128,7 +128,7 @@ The different parameter types are:
 In addition to accessing the current value, the parameter object can be used to 
 publish an update to the parameter using the `.update()` method.
 
-Finally, in some cases a direct callback may be desired to notify the process
+In some cases a direct callback may be desired to notify the process
 that the value has changed:
 
 ```
@@ -140,6 +140,15 @@ while (rclcpp::ok()) {
     process.exectute();
     rclcpp::spin_some(node);
 }
+```
+
+Finally, it's possible to register a callback to notify the process that any of the registered 
+dynamic parameters has been updated:
+
+```
+    params.setCallback([]() {
+        // do something
+    });
 ```
 
 These different approaches are not mutually exclusive and can be used in concert.

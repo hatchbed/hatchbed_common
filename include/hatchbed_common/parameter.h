@@ -198,7 +198,14 @@ class Parameter {
         rcl_interfaces::msg::ParameterDescriptor descriptor;
         descriptor.description = description_;
         descriptor.read_only = !is_dynamic_;
-        node_->declare_parameter(name_, rclcpp::ParameterValue(default_val_), descriptor);
+
+        try {
+            node_->declare_parameter(name_, rclcpp::ParameterValue(default_val_), descriptor);
+        }
+        catch (const rclcpp::exceptions::ParameterAlreadyDeclaredException& e) {
+            RCLCPP_WARN(node_->get_logger(), "Parameter [%s] already declared: %s", name_.c_str(),
+                        e.what());
+        }
 
         update(getParameter());
         RCLCPP_INFO_STREAM(this->node_->get_logger(), this->namespace_ << "/" << this->name_ << ": " << toString(this->value()));
@@ -341,7 +348,14 @@ class NumericParameter : public Parameter<T> {
             descriptor.floating_point_range[0].to_value = max_;
             descriptor.floating_point_range[0].step = step_;
         }
-        this->node_->declare_parameter(this->name_, rclcpp::ParameterValue(this->default_val_), descriptor);
+        try {
+            this->node_->declare_parameter(this->name_, rclcpp::ParameterValue(this->default_val_), descriptor);
+        }
+        catch (const rclcpp::exceptions::ParameterAlreadyDeclaredException& e) {
+            RCLCPP_WARN(this->node_->get_logger(), "Parameter [%s] already declared: %s", 
+                        this->name_.c_str(), e.what());
+        }
+
         this->update(this->getParameter());
 
         RCLCPP_INFO_STREAM(this->node_->get_logger(), this->namespace_ << "/" << this->name_ << ": " << toString(this->value()));
@@ -468,7 +482,14 @@ class IntParameter : public NumericParameter<int> {
             descriptor.integer_range[0].to_value = max_;
             descriptor.integer_range[0].step = step_;
         }
-        node_->declare_parameter(name_, rclcpp::ParameterValue(default_val_), descriptor);
+
+        try {
+            node_->declare_parameter(name_, rclcpp::ParameterValue(default_val_), descriptor);
+        }
+        catch (const rclcpp::exceptions::ParameterAlreadyDeclaredException& e) {
+            RCLCPP_INFO(node_->get_logger(), "Parameter [%s] already declared: %s", name_.c_str(), 
+                        e.what());
+        }
 
         update(getParameter());
 
