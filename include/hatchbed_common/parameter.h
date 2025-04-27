@@ -189,6 +189,7 @@ class ParameterBase {
     }
 
     virtual std::string toString(const T& value) const {
+        (void)value;
         // Cannot be a pure virtual function because it would cause Parameter<T> to be an abstract class
         // and the Declared class would not be able to instantiate a Parameter<T> object.
         throw std::runtime_error("toString method should be overriden by derived classes");
