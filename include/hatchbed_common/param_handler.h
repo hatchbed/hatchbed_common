@@ -200,7 +200,46 @@ class ParamHandler {
      *
      * @returns the value of the parameter.
      */
-    IntParameter& param(const std::string& name, const int64_t& default_val, const std::string& description) {
+    Int64Parameter& param(const std::string& name, const int64_t& default_val, const std::string& description) {
+        std::scoped_lock lock(mutex_);
+        int64_params_[name] = Int64Parameter(nullptr, namespace_, name, default_val, description, node_);
+        return int64_params_[name];
+    }
+
+    /**
+     * Register an integer parameter and return its value.
+     *
+     * NOTE: This version is only recommended for single threaded applications since the user provided parameter
+     *       pointer won't be fully guarded from concurrent usage.
+     *
+     *       The point should also remain valid for the life of the handler.
+     *
+     * @param[out] param       Reference to parameter variable
+     * @param[in] name         Parameter name
+     * @param[in] default_val  Default parameter value
+     * @param[in] description  Parameter description
+     *
+     * @returns the value of the parameter.
+     */
+    Int64Parameter& param(int64_t* param, const std::string& name, const int64_t& default_val, const std::string& description) {
+        std::scoped_lock lock(mutex_);
+        int64_params_[name] = Int64Parameter(param, namespace_, name, default_val, description, node_);
+        return int64_params_[name];
+    }
+
+
+    /**
+     * Register an integer parameter and return its value.
+     *
+     * NOTE: This version is uses the ambiguous system int type. If full 64 bit range is required, use Int64Parameter signature (literals need to be specified as int64_t).
+     *
+     * @param[in] name         Parameter name
+     * @param[in] default_val  Default parameter value
+     * @param[in] description  Parameter description
+     *
+     * @returns the value of the parameter.
+     */
+    IntParameter& param(const std::string& name, const int& default_val, const std::string& description) {
         std::scoped_lock lock(mutex_);
         int_params_[name] = IntParameter(nullptr, namespace_, name, default_val, description, node_);
         return int_params_[name];
@@ -209,6 +248,8 @@ class ParamHandler {
     /**
      * Register an integer parameter and return its value.
      *
+     * NOTE: This version is uses the ambiguous system int type. If full 64 bit range is required, use Int64Parameter.
+     *
      * NOTE: This version is only recommended for single threaded applications since the user provided parameter
      *       pointer won't be fully guarded from concurrent usage.
      *
@@ -221,55 +262,12 @@ class ParamHandler {
      *
      * @returns the value of the parameter.
      */
-    IntParameter& param(int64_t* param, const std::string& name, const int64_t& default_val, const std::string& description) {
+    IntParameter& param(int* param, const std::string& name, const int& default_val, const std::string& description) {
         std::scoped_lock lock(mutex_);
         int_params_[name] = IntParameter(param, namespace_, name, default_val, description, node_);
         return int_params_[name];
     }
 
-
-    /**
-     * Register an integer parameter and return its value.
-     *
-     * NOTE: This version is uses the ambiguous system int type. If full 64 bit range is required, use IntParameter signature (literals need to be specified as int64_t).
-     *
-     * NOTE: This version is uses the ambiguous system int type. It's preferred to use the IntParameter version (int64_t)
-     *
-     * @param[in] name         Parameter name
-     * @param[in] default_val  Default parameter value
-     * @param[in] description  Parameter description
-     *
-     * @returns the value of the parameter.
-     */
-    IntSystemParameter& param(const std::string& name, const int& default_val, const std::string& description) {
-        std::scoped_lock lock(mutex_);
-        int_system_params_[name] = IntSystemParameter(nullptr, namespace_, name, default_val, description, node_);
-        return int_system_params_[name];
-    }
-
-    /**
-     * Register an integer parameter and return its value.
-     *
-     * NOTE: This version is uses the ambiguous system int type. If full 64 bit range is required, use IntParameter.
-     *
-     * NOTE: This version is only recommended for single threaded applications since the user provided parameter
-     *       pointer won't be fully guarded from concurrent usage.
-     *
-     *       The point should also remain valid for the life of the handler.
-     *
-     * @param[out] param       Reference to parameter variable
-     * @param[in] name         Parameter name
-     * @param[in] default_val  Default parameter value
-     * @param[in] description  Parameter description
-     *
-     * @returns the value of the parameter.
-     */
-    IntSystemParameter& param(int* param, const std::string& name, const int& default_val, const std::string& description) {
-        std::scoped_lock lock(mutex_);
-        int_system_params_[name] = IntSystemParameter(param, namespace_, name, default_val, description, node_);
-        return int_system_params_[name];
-    }
-
     /**
      * Register an integer array parameter and return its value.
      *
@@ -279,10 +277,10 @@ class ParamHandler {
      *
      * @returns the value of the parameter.
      */
-    IntArrayParameter& param(const std::string& name, const std::vector<int64_t>& default_val, const std::string& description) {
+    Int64ArrayParameter& param(const std::string& name, const std::vector<int64_t>& default_val, const std::string& description) {
         std::scoped_lock lock(mutex_);
-        int_array_params_[name] = IntArrayParameter(nullptr, namespace_, name, default_val, description, node_);
-        return int_array_params_[name];
+        int64_array_params_[name] = Int64ArrayParameter(nullptr, namespace_, name, default_val, description, node_);
+        return int64_array_params_[name];
     }
 
     /**
@@ -300,10 +298,10 @@ class ParamHandler {
      *
      * @returns the value of the parameter.
      */
-    IntArrayParameter& param(std::vector<int64_t>* param, const std::string& name, const std::vector<int64_t>& default_val, const std::string& description) {
+    Int64ArrayParameter& param(std::vector<int64_t>* param, const std::string& name, const std::vector<int64_t>& default_val, const std::string& description) {
         std::scoped_lock lock(mutex_);
-        int_array_params_[name] = IntArrayParameter(param, namespace_, name, default_val, description, node_);
-        return int_array_params_[name];
+        int64_array_params_[name] = Int64ArrayParameter(param, namespace_, name, default_val, description, node_);
+        return int64_array_params_[name];
     }
 
     /**
@@ -467,9 +465,9 @@ private:
   std::unordered_map<std::string, BoolArrayParameter> bool_array_params_;
   std::unordered_map<std::string, DoubleParameter> double_params_;
   std::unordered_map<std::string, DoubleArrayParameter> double_array_params_;
+  std::unordered_map<std::string, Int64Parameter> int64_params_;
   std::unordered_map<std::string, IntParameter> int_params_;
-  std::unordered_map<std::string, IntSystemParameter> int_system_params_;
-  std::unordered_map<std::string, IntArrayParameter> int_array_params_;
+  std::unordered_map<std::string, Int64ArrayParameter> int64_array_params_;
   std::unordered_map<std::string, StringParameter> string_params_;
   std::unordered_map<std::string, StringArrayParameter> string_array_params_;
 
@@ -528,38 +526,38 @@ private:
             }
         }
         else if (param.get_type() == rclcpp::ParameterType::PARAMETER_INTEGER) {
-            auto int_param = int_params_.find(param.get_name());
-            if (int_param != int_params_.end()) {
-                if (int_param->second.update(param.as_int(), true)) {
+            auto int64_param = int64_params_.find(param.get_name());
+            if (int64_param != int64_params_.end()) {
+                if (int64_param->second.update(param.as_int(), true)) {
                     result.successful = true;
                     result.reason = "success";
                 } else {
                     result.successful = false;
-                    result.reason = "Failed to update parameter: " + int_param->first;
+                    result.reason = "Failed to update parameter: " + int64_param->first;
                 }
             } else {
                 // the parameter is not registered as int64_t, so we need to check if it's registered as system int
-                auto int_system_param = int_system_params_.find(param.get_name());
-                if (int_system_param != int_system_params_.end()) {
-                    if (int_system_param->second.update(param.as_int(), true)) {
+                auto int_param = int_params_.find(param.get_name());
+                if (int_param != int_params_.end()) {
+                    if (int_param->second.update(param.as_int(), true)) {
                         result.successful = true;
                         result.reason = "success";
                     } else {
                         result.successful = false;
-                        result.reason = "Failed to update parameter: " + int_system_param->first;
+                        result.reason = "Failed to update parameter: " + int_param->first;
                     }
                 }
             }
         }
         else if (param.get_type() == rclcpp::ParameterType::PARAMETER_INTEGER_ARRAY) {
-            auto int_array_param = int_array_params_.find(param.get_name());
-            if (int_array_param != int_array_params_.end()) {
-                if (int_array_param->second.update(param.as_integer_array(), true)) {
+            auto int64_array_param = int64_array_params_.find(param.get_name());
+            if (int64_array_param != int64_array_params_.end()) {
+                if (int64_array_param->second.update(param.as_integer_array(), true)) {
                     result.successful = true;
                     result.reason = "success";
                 } else {
                     result.successful = false;
-                    result.reason = "Failed to update parameter: " + int_array_param->first;
+                    result.reason = "Failed to update parameter: " + int64_array_param->first;
                 }
             }
         }

@@ -616,9 +616,9 @@ template class NumericArrayParameter<double>;
 
 typedef Parameter<std::string> StringParameter;
 typedef ArrayParameter<std::string> StringArrayParameter;
-typedef IntBaseParameter<int> IntSystemParameter;
-typedef IntBaseParameter<int64_t> IntParameter;
-typedef NumericArrayParameter<int64_t> IntArrayParameter;
+typedef IntBaseParameter<int> IntParameter;
+typedef IntBaseParameter<int64_t> Int64Parameter;
+typedef NumericArrayParameter<int64_t> Int64ArrayParameter;
 typedef NumericParameter<double> DoubleParameter;
 typedef NumericArrayParameter<double> DoubleArrayParameter;
 
