@@ -85,6 +85,10 @@ int mode = params.param("mode", 0, "Operating mode").enumerate({
 
 The Param Handler can also handle lists of values for parameters. ROS doesn't support range/step constraints for numeric arrays, so the min/max/step methods are not available for the numeric arrays. If ROS adds support for array constraints this will be updated.
 
+```
+auto node = std::make_shared<rclcpp::Node>("param_handler_example");
+hatchbed_common::ParamHandler params(node);
+
 // integer array parameter
 std::vector<int64_t> int_params = params.param("int_params", std::vector<int64_t>{1, 2, 3}, "Integer array").declare().value();
 
@@ -96,6 +100,7 @@ std::vector<std::string> string_params = params.param("string_params", std::vect
 
 // bool array parameter
 std::vector<bool> bool_params = params.param("bool_params", std::vector<bool>{true, false, true}, "Boolean array").declare().value();
+```
 
 #### Dynamic Parameters
 
