@@ -111,6 +111,17 @@ class ParameterBase {
         return Declared(*this);
     }
 
+    // NOTE: This class uses method chaining (i.e. modifiers to the parameter return the object reference so that you can chain the modifiers together)
+    //   e.g. params.param("param_name", 0).min(0).max(10).step(1).callback([](int value) { ... }).declare();
+    //   Any child class that creates a new method should override any parent class chaining methods to return the child class type.
+    //   e.g. class ChildParameter : public Parameter<int> {
+    //       virtual ChildParameter& dynamic() override {
+    //           ParameterBase<int>::dynamic();
+    //           return *this;
+    //       }
+    //   };
+    //   Otherwise the return value will be of type ParameterBase<T> and not the child class type and any child class methods will not be available.
+
     virtual ParameterBase& callback(std::function<void(T)> callback) {
         is_dynamic_ = true;
         user_callback_ = callback;
@@ -268,14 +279,14 @@ class ArrayParameter : public ParameterBase<std::vector<T>> {
     protected:
     virtual std::string toString(const std::vector<T>& values) const override {
         std::stringstream ss;
-        ss << "[";
+        ss << "{";
         for (size_t i = 0; i < values.size(); ++i) {
             ss << values[i];
             if (i < values.size() - 1) {
                 ss << ", ";
             }
         }
-        ss << "]";
+        ss << "}";
         return ss.str();
     }
 };
@@ -312,14 +323,14 @@ class BoolArrayParameter : public ArrayParameter<bool> {
     protected:
     virtual std::string toString(const std::vector<bool>& values) const override {
         std::stringstream ss;
-        ss << "[";
+        ss << "{";
         for (size_t i = 0; i < values.size(); ++i) {
             ss << (values[i] ? "true" : "false");
             if (i < values.size() - 1) {
                 ss << ", ";
             }
         }
-        ss << "]";
+        ss << "}";
         return ss.str();
     }
 };
@@ -457,14 +468,14 @@ class NumericArrayParameter : public ArrayParameter<T> {
     protected:
     virtual std::string toString(const std::vector<T>& values) const override {
         std::stringstream ss;
-        ss << "[";
+        ss << "{";
         for (size_t i = 0; i < values.size(); ++i) {
             ss << std::to_string(values[i]);
             if (i < values.size() - 1) {
                 ss << ", ";
             }
         }
-        ss << "]";
+        ss << "}";
         return ss.str();
     }
 };
