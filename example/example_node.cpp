@@ -59,8 +59,13 @@ int main(int argc, char **argv)
         }
         else {
             RCLCPP_INFO(node->get_logger(), "Feedback is currently not enabled.");
-
         }
+
+        std::stringstream ss;
+        for (size_t i = 0; i < dynamic_double_params.size(); ++i) {
+            ss << dynamic_double_params[i] << " ";
+        }
+        RCLCPP_INFO(node->get_logger(), "Dynamic double params: %s", ss.str().c_str());
     });
 
     rclcpp::spin(node);

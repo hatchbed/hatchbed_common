@@ -465,7 +465,87 @@ class NumericArrayParameter : public ArrayParameter<T> {
     NumericArrayParameter(const NumericArrayParameter& parameter) = default;
     virtual ~NumericArrayParameter() = default; 
 
+    virtual NumericArrayParameter<T>& callback(std::function<void(std::vector<T>)> callback) override {
+        ArrayParameter<T>::callback(callback);
+        return *this;
+    }
+
+    virtual NumericArrayParameter<T>& dynamic() override {
+        ArrayParameter<T>::dynamic();
+        return *this;
+    }
+
+    virtual NumericArrayParameter<T>& min(T min) {
+        min_ = min;
+        has_range_ = true;
+        if (max_ < min_) {
+            max_ = min_;
+        }
+        this->default_val_ = clamp(this->default_val_);
+        return *this;
+    }
+
+    virtual NumericArrayParameter<T>& max(T max) {
+        max_ = max;
+        has_range_ = true;
+        if (min_ > max_) {
+            min_ = max_;
+        }
+        this->default_val_ = clamp(this->default_val_);
+        return *this;
+    }
+
+    virtual NumericArrayParameter<T>& step(T step) {
+        step_ = step;
+        return *this;
+    }
+
+    T min() const {
+        return min_;
+    }
+
+    bool hasRange() const {
+        return has_range_;
+    }
+
+
+    T max() const {
+        return max_;
+    }
+
+    std::vector<T> clamp(const std::vector<T>& values) const {
+        std::vector<T> clamped_values;
+        for (const auto& value: values) {
+            T clamped = value;
+
+            if (has_range_ && clamped < min_) {
+                clamped = min_;
+            }
+            if (has_range_ && clamped > max_) {
+                clamped = max_;
+            }
+
+            clamped_values.push_back(clamped);
+        }
+
+        return clamped_values;
+    }
+
     protected:
+    virtual bool update(const std::vector<T>& values, bool from_callback = false) {
+        if (has_range_) {
+            for (const auto& value: values) {
+                if (value < min_ || value > max_) {
+                    RCLCPP_WARN_STREAM(this->node_->get_logger(),  this->namespace_ << "/" << this->name_
+                                       << ": value out of range <" << value << ">");
+                    return false;
+                }
+            }
+        }
+
+        return ArrayParameter<T>::update(values, from_callback);
+    }
+
     virtual std::string toString(const std::vector<T>& values) const override {
         std::stringstream ss;
         ss << "{";
@@ -478,6 +558,37 @@ class NumericArrayParameter : public ArrayParameter<T> {
         ss << "}";
         return ss.str();
     }
+
+    virtual void registerParam() override {
+        rcl_interfaces::msg::ParameterDescriptor descriptor;
+        descriptor.description = this->description_;
+        descriptor.read_only = !this->is_dynamic_;
+        if (has_range_) {
+            descriptor.floating_point_range.resize(1);
+            descriptor.floating_point_range[0].from_value = min_;
+            descriptor.floating_point_range[0].to_value = max_;
+            descriptor.floating_point_range[0].step = step_;
+        }
+        try {
+            this->node_->declare_parameter(this->name_, rclcpp::ParameterValue(this->default_val_), descriptor);
+        }
+        catch (const rclcpp::exceptions::ParameterAlreadyDeclaredException& e) {
+            RCLCPP_WARN(this->node_->get_logger(), "Parameter [%s] already declared: %s", 
+                        this->name_.c_str(), e.what());
+        }
+
+        this->update(this->getParameter());
+
+        RCLCPP_INFO_STREAM(this->node_->get_logger(), this->namespace_ << "/" << this->name_ << ": " << toString(this->value()));
+        this->initialized_ = true;
+    }
+
+    T min_ = -10000;
+    T max_ = 10000;
+    T step_ = 0;
+    bool has_range_ = false;
+
+    friend class ParamHandler;
 };
 
 template <typename T>
