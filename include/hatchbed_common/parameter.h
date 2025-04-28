@@ -62,8 +62,9 @@ struct BorrowedStore {
     std::mutex mutex;
 };
 
+template <typename T>
 struct EnumOption {
-    int64_t value;
+    T value;
     std::string name;
     std::string description;
 };
@@ -234,7 +235,7 @@ class ParameterBase {
     friend class ParamHandler;
 };
 
-template <class T>
+template <typename T>
 class Parameter : public ParameterBase<T> {
     public:
     Parameter(T* store, const std::string& ns, const std::string& name, T default_val, const std::string& description,
@@ -253,7 +254,7 @@ class Parameter : public ParameterBase<T> {
     }
 };
 
-template <class T>
+template <typename T>
 class ArrayParameter : public ParameterBase<std::vector<T>> {
     public:
     ArrayParameter(std::vector<T>* store, const std::string& ns, const std::string& name, std::vector<T> default_val,
@@ -468,48 +469,49 @@ class NumericArrayParameter : public ArrayParameter<T> {
     }
 };
 
-class IntParameter : public NumericParameter<int64_t> {
+template <typename T>
+class IntBaseParameter : public NumericParameter<T> {
     public:
-    IntParameter(int64_t* store, const std::string& ns, const std::string& name, int64_t default_val,
+    IntBaseParameter(T* store, const std::string& ns, const std::string& name, T default_val,
                  const std::string& description, std::shared_ptr<rclcpp::Node> node)
-      : NumericParameter<int64_t>(store, ns, name, default_val, description, node) {}
+      : NumericParameter<T>(store, ns, name, default_val, description, node) {}
 
-    IntParameter() = default;
-    IntParameter(const IntParameter& parameter) = default;
-    virtual ~IntParameter() = default;
+    IntBaseParameter() = default;
+    IntBaseParameter(const IntBaseParameter& parameter) = default;
+    virtual ~IntBaseParameter() = default;
 
-    virtual IntParameter& callback(std::function<void(int64_t)> callback) override {
-        NumericParameter<int64_t>::callback(callback);
+    virtual IntBaseParameter<T>& callback(std::function<void(T)> callback) override {
+        NumericParameter<T>::callback(callback);
         return *this;
     }
 
-    virtual IntParameter& dynamic() override {
-        NumericParameter<int64_t>::dynamic();
+    virtual IntBaseParameter<T>& dynamic() override {
+        NumericParameter<T>::dynamic();
         return *this;
     }
 
-    virtual IntParameter& min(int64_t min) override {
+    virtual IntBaseParameter<T>& min(T min) override {
         if (enums_.empty()) {
-            NumericParameter<int64_t>::min(min);
+            NumericParameter<T>::min(min);
         }
         return *this;
     }
 
-    virtual IntParameter& max(int64_t max) override {
+    virtual IntBaseParameter<T>& max(T max) override {
         if (enums_.empty()) {
-            NumericParameter<int64_t>::max(max);
+            NumericParameter<T>::max(max);
         }
         return *this;
     }
 
-    virtual IntParameter& step(int64_t step) {
+    virtual IntBaseParameter<T>& step(T step) {
         if (enums_.empty()) {
-            NumericParameter<int64_t>::step(step);
+            NumericParameter<T>::step(step);
         }
         return *this;
     }
 
-    virtual IntParameter& enumerate(const std::vector<EnumOption>& enums) {
+    virtual IntBaseParameter<T>& enumerate(const std::vector<EnumOption<T>>& enums) {
         enums_ = enums;
         if (!enums_.empty()) {
             this->has_range_ = false;
@@ -524,14 +526,14 @@ class IntParameter : public NumericParameter<int64_t> {
         return *this;
     }
 
-    const std::vector<EnumOption>& enums() const {
+    const std::vector<EnumOption<T>>& enums() const {
         return enums_;
     }
 
     protected:
-    virtual bool update(const int64_t& value, bool from_callback = false) {
+    virtual bool update(const T& value, bool from_callback = false) {
         if (enums_.empty()) {
-            return NumericParameter<int64_t>::update(value, from_callback);
+            return NumericParameter<T>::update(value, from_callback);
         }
 
         bool valid = false;
@@ -543,13 +545,13 @@ class IntParameter : public NumericParameter<int64_t> {
         }
 
         if (valid) {
-            return Parameter<int64_t>::update(value, from_callback);
+            return Parameter<T>::update(value, from_callback);
         }
 
         return false;
     }
 
-    virtual std::string toString(const int64_t& value) const override {
+    virtual std::string toString(const T& value) const override {
         std::string str = std::to_string(value);
 
         for (const auto& option: enums_) {
@@ -562,7 +564,7 @@ class IntParameter : public NumericParameter<int64_t> {
 
     virtual void registerParam() override {
         rcl_interfaces::msg::ParameterDescriptor descriptor;
-        descriptor.description = description_;
+        descriptor.description = this->description_;
 
         // generate enum description
         if (!enums_.empty()) {
@@ -572,30 +574,30 @@ class IntParameter : public NumericParameter<int64_t> {
             }
         }
 
-        descriptor.read_only = !is_dynamic_;
+        descriptor.read_only = !this->is_dynamic_;
 
-        if (has_range_ || !enums_.empty()) {
+        if (this->has_range_ || !enums_.empty()) {
             descriptor.integer_range.resize(1);
-            descriptor.integer_range[0].from_value = min_;
-            descriptor.integer_range[0].to_value = max_;
-            descriptor.integer_range[0].step = step_;
+            descriptor.integer_range[0].from_value = this->min_;
+            descriptor.integer_range[0].to_value = this->max_;
+            descriptor.integer_range[0].step = this->step_;
         }
 
         try {
-            node_->declare_parameter(name_, rclcpp::ParameterValue(default_val_), descriptor);
+            this->node_->declare_parameter(this->name_, rclcpp::ParameterValue(this->default_val_), descriptor);
         }
         catch (const rclcpp::exceptions::ParameterAlreadyDeclaredException& e) {
-            RCLCPP_INFO(node_->get_logger(), "Parameter [%s] already declared: %s", name_.c_str(), 
+            RCLCPP_INFO(this->node_->get_logger(), "Parameter [%s] already declared: %s", this->name_.c_str(), 
                         e.what());
         }
 
-        update(getParameter());
+        this->update(this->getParameter());
 
-        RCLCPP_INFO_STREAM(node_->get_logger(), namespace_ << "/" << name_ << ": " << toString(value()));
-        initialized_ = true;
+        RCLCPP_INFO_STREAM(this->node_->get_logger(), this->namespace_ << "/" << this->name_ << ": " << toString(this->value()));
+        this->initialized_ = true;
     }
 
-    std::vector<EnumOption> enums_;
+    std::vector<EnumOption<T>> enums_;
 
     friend class ParamHandler;
 };
@@ -604,13 +606,18 @@ template class Parameter<bool>;
 template class ArrayParameter<bool>;
 template class Parameter<std::string>;
 template class ArrayParameter<std::string>;
+template class NumericParameter<int>;
 template class NumericParameter<int64_t>;
+template class IntBaseParameter<int>;
+template class IntBaseParameter<int64_t>;
 template class NumericArrayParameter<int64_t>;
 template class NumericParameter<double>;
 template class NumericArrayParameter<double>;
 
 typedef Parameter<std::string> StringParameter;
 typedef ArrayParameter<std::string> StringArrayParameter;
+typedef IntBaseParameter<int> IntSystemParameter;
+typedef IntBaseParameter<int64_t> IntParameter;
 typedef NumericArrayParameter<int64_t> IntArrayParameter;
 typedef NumericParameter<double> DoubleParameter;
 typedef NumericArrayParameter<double> DoubleArrayParameter;

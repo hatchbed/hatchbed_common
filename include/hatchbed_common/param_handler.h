@@ -209,21 +209,6 @@ class ParamHandler {
     /**
      * Register an integer parameter and return its value.
      *
-     * @param[in] name         Parameter name
-     * @param[in] default_val  Default parameter value
-     * @param[in] description  Parameter description
-     *
-     * @returns the value of the parameter.
-     */
-    IntParameter& param(const std::string& name, const int& default_val, const std::string& description) {
-        std::scoped_lock lock(mutex_);
-        int_params_[name] = IntParameter(nullptr, namespace_, name, int64_t(default_val), description, node_);
-        return int_params_[name];
-    }
-
-    /**
-     * Register an integer parameter and return its value.
-     *
      * NOTE: This version is only recommended for single threaded applications since the user provided parameter
      *       pointer won't be fully guarded from concurrent usage.
      *
@@ -242,8 +227,30 @@ class ParamHandler {
         return int_params_[name];
     }
 
+
     /**
      * Register an integer parameter and return its value.
+     *
+     * NOTE: This version is uses the ambiguous system int type. If full 64 bit range is required, use IntParameter signature (literals need to be specified as int64_t).
+     *
+     * NOTE: This version is uses the ambiguous system int type. It's preferred to use the IntParameter version (int64_t)
+     *
+     * @param[in] name         Parameter name
+     * @param[in] default_val  Default parameter value
+     * @param[in] description  Parameter description
+     *
+     * @returns the value of the parameter.
+     */
+    IntSystemParameter& param(const std::string& name, const int& default_val, const std::string& description) {
+        std::scoped_lock lock(mutex_);
+        int_system_params_[name] = IntSystemParameter(nullptr, namespace_, name, default_val, description, node_);
+        return int_system_params_[name];
+    }
+
+    /**
+     * Register an integer parameter and return its value.
+     *
+     * NOTE: This version is uses the ambiguous system int type. If full 64 bit range is required, use IntParameter.
      *
      * NOTE: This version is only recommended for single threaded applications since the user provided parameter
      *       pointer won't be fully guarded from concurrent usage.
@@ -257,10 +264,10 @@ class ParamHandler {
      *
      * @returns the value of the parameter.
      */
-    IntParameter& param(int64_t* param, const std::string& name, const int& default_val, const std::string& description) {
+    IntSystemParameter& param(int* param, const std::string& name, const int& default_val, const std::string& description) {
         std::scoped_lock lock(mutex_);
-        int_params_[name] = IntParameter(param, namespace_, name, int64_t(default_val), description, node_);
-        return int_params_[name];
+        int_system_params_[name] = IntSystemParameter(param, namespace_, name, default_val, description, node_);
+        return int_system_params_[name];
     }
 
     /**
@@ -461,20 +468,24 @@ private:
   std::unordered_map<std::string, DoubleParameter> double_params_;
   std::unordered_map<std::string, DoubleArrayParameter> double_array_params_;
   std::unordered_map<std::string, IntParameter> int_params_;
+  std::unordered_map<std::string, IntSystemParameter> int_system_params_;
   std::unordered_map<std::string, IntArrayParameter> int_array_params_;
   std::unordered_map<std::string, StringParameter> string_params_;
   std::unordered_map<std::string, StringArrayParameter> string_array_params_;
 
   rcl_interfaces::msg::SetParametersResult parametersCallback(const std::vector<rclcpp::Parameter> &parameters) {
     rcl_interfaces::msg::SetParametersResult result;
-    result.successful = true;
-    result.reason = "success";
+    result.successful = false;
+    result.reason = "parameter not found";
 
     for (const auto &param: parameters) {
         if (param.get_type() == rclcpp::ParameterType::PARAMETER_BOOL) {
             auto bool_param = bool_params_.find(param.get_name());
             if (bool_param != bool_params_.end()) {
-                if (!bool_param->second.update(param.as_bool(), true)) {
+                if (bool_param->second.update(param.as_bool(), true)) {
+                    result.successful = true;
+                    result.reason = "success";
+                } else {
                     result.successful = false;
                     result.reason = "Failed to update parameter: " + bool_param->first;
                 }
@@ -483,7 +494,10 @@ private:
         else if (param.get_type() == rclcpp::ParameterType::PARAMETER_BOOL_ARRAY) {
             auto bool_array_param = bool_array_params_.find(param.get_name());
             if (bool_array_param != bool_array_params_.end()) {
-                if (!bool_array_param->second.update(param.as_bool_array(), true)) {
+                if (bool_array_param->second.update(param.as_bool_array(), true)) {
+                    result.successful = true;
+                    result.reason = "success";
+                } else {
                     result.successful = false;
                     result.reason = "Failed to update parameter: " + bool_array_param->first;
                 }
@@ -492,7 +506,10 @@ private:
         else if (param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE) {
             auto double_param = double_params_.find(param.get_name());
             if (double_param != double_params_.end()) {
-                if (!double_param->second.update(param.as_double(), true)) {
+                if (double_param->second.update(param.as_double(), true)) {
+                    result.successful = true;
+                    result.reason = "success";
+                } else {
                     result.successful = false;
                     result.reason = "Failed to update parameter: " + double_param->first;
                 }
@@ -501,7 +518,10 @@ private:
         else if (param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE_ARRAY) {
             auto double_array_param = double_array_params_.find(param.get_name());
             if (double_array_param != double_array_params_.end()) {
-                if (!double_array_param->second.update(param.as_double_array(), true)) {
+                if (double_array_param->second.update(param.as_double_array(), true)) {
+                    result.successful = true;
+                    result.reason = "success";
+                } else {
                     result.successful = false;
                     result.reason = "Failed to update parameter: " + double_array_param->first;
                 }
@@ -510,16 +530,34 @@ private:
         else if (param.get_type() == rclcpp::ParameterType::PARAMETER_INTEGER) {
             auto int_param = int_params_.find(param.get_name());
             if (int_param != int_params_.end()) {
-                if (!int_param->second.update(param.as_int(), true)) {
+                if (int_param->second.update(param.as_int(), true)) {
+                    result.successful = true;
+                    result.reason = "success";
+                } else {
                     result.successful = false;
                     result.reason = "Failed to update parameter: " + int_param->first;
+                }
+            } else {
+                // the parameter is not registered as int64_t, so we need to check if it's registered as system int
+                auto int_system_param = int_system_params_.find(param.get_name());
+                if (int_system_param != int_system_params_.end()) {
+                    if (int_system_param->second.update(param.as_int(), true)) {
+                        result.successful = true;
+                        result.reason = "success";
+                    } else {
+                        result.successful = false;
+                        result.reason = "Failed to update parameter: " + int_system_param->first;
+                    }
                 }
             }
         }
         else if (param.get_type() == rclcpp::ParameterType::PARAMETER_INTEGER_ARRAY) {
             auto int_array_param = int_array_params_.find(param.get_name());
             if (int_array_param != int_array_params_.end()) {
-                if (!int_array_param->second.update(param.as_integer_array(), true)) {
+                if (int_array_param->second.update(param.as_integer_array(), true)) {
+                    result.successful = true;
+                    result.reason = "success";
+                } else {
                     result.successful = false;
                     result.reason = "Failed to update parameter: " + int_array_param->first;
                 }
@@ -528,7 +566,10 @@ private:
         else if (param.get_type() == rclcpp::ParameterType::PARAMETER_STRING) {
             auto string_param = string_params_.find(param.get_name());
             if (string_param != string_params_.end()) {
-                if (!string_param->second.update(param.as_string(), true)) {
+                if (string_param->second.update(param.as_string(), true)) {
+                    result.successful = true;
+                    result.reason = "success";
+                } else {
                     result.successful = false;
                     result.reason = "Failed to update parameter: " + string_param->first;
                 }
@@ -537,7 +578,10 @@ private:
         else if (param.get_type() == rclcpp::ParameterType::PARAMETER_STRING_ARRAY) {
             auto string_array_param = string_array_params_.find(param.get_name());
             if (string_array_param != string_array_params_.end()) {
-                if (!string_array_param->second.update(param.as_string_array(), true)) {
+                if (string_array_param->second.update(param.as_string_array(), true)) {
+                    result.successful = true;
+                    result.reason = "success";
+                } else {
                     result.successful = false;
                     result.reason = "Failed to update parameter: " + string_array_param->first;
                 }
