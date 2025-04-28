@@ -65,32 +65,41 @@ hatchbed_common::ParamHandler params(node);
 // integer parameter
 int num_tries = params.param("num_tries", 1, "Number of tries").min(1).max(50).declare().value();
 
-// integer array parameter
-std::vector<int64_t> int_params = params.param("int_params", std::vector<int64_t>{1, 2, 3}, "Integer array").declare().value();
-
 // string parameter
 std::string frame_id = params.param("frame_id", std::string("base_link"), "TF frame").declare().value();
-
-// string array parameter
-std::vector<std::string> string_params = params.param("string_params", std::vector<std::string>{"a", "b", "c"}, "String array").declare().value();
 
 // bool parameter
 bool debug = params.param("debug", false, "Enable debug mode").value();
 
-// bool array parameter
-std::vector<bool> bool_params = params.param("bool_params", std::vector<bool>{true, false, true}, "Boolean array").declare().value();
-
 // double parameter
 double threshold = params.param("threshold", 0.75, "Threshold value").min(0.0).max(1.0).declare().value();
-
-// double array parameter
-std::vector<double> double_params = params.param("double_params", std::vector<double>{0.1, 0.2, 0.3}, "Double array").declare().value();
 
 // enum parameter
 int mode = params.param("mode", 0, "Operating mode").enumerate({
     {0, "Default", "Default operating mode"},
     {1, "Advanced", "Advanced operating mode"},
     {20, "Legacy", "Legacy operating mode"}}).declare().value();
+```
+
+#### Array Parameters
+
+The Param Handler can also handle lists of values for parameters. ROS doesn't support range/step constraints for numeric arrays, so the min/max/step methods are not available for the numeric arrays. If ROS adds support for array constraints this will be updated.
+
+```
+auto node = std::make_shared<rclcpp::Node>("param_handler_example");
+hatchbed_common::ParamHandler params(node);
+
+// integer array parameter
+std::vector<int64_t> int_params = params.param("int_params", std::vector<int64_t>{1, 2, 3}, "Integer array").declare().value();
+
+// double array parameter
+std::vector<double> double_params = params.param("double_params", std::vector<double>{0.1, 0.2, 0.3}, "Double array").declare().value();
+
+// string array parameter
+std::vector<std::string> string_params = params.param("string_params", std::vector<std::string>{"a", "b", "c"}, "String array").declare().value();
+
+// bool array parameter
+std::vector<bool> bool_params = params.param("bool_params", std::vector<bool>{true, false, true}, "Boolean array").declare().value();
 ```
 
 #### Dynamic Parameters
@@ -104,14 +113,17 @@ parameter should be stored:
 int num_tries = 0;
 params.param(&num_tries, "num_tries", 1, "Number of tries").min(1).max(50).dynamic().declare();
 
+std::vector<double> dynamic_double_params;
+params.param(&dynamic_double_params, "dynamic_double_params", std::vector<double>{0.1, 0.2, 0.3}, "Dynamic double array").dynamic().declare();
+
 while (rclcpp::ok()) {
-    process.execute(num_tries);
+    process.execute(num_tries, dynamic_double_params);
     rclcpp::spin_some(node);
 }
 
 ```
 
-Here the `num_tries` int variable will be automatically updated.
+Here the `num_tries` int and `dynamic_double_params` std::vector<double> variables will be automatically updated.
 
 When multi-threading is involved the above method is not recommended.  Instead
 the parameter object returned by the handler should be used to ensure thread-safe
