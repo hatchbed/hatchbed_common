@@ -23,6 +23,9 @@ int main(int argc, char **argv)
     // Static parameters
     //
     int num_tries = params.param("num_tries", 1, "Number of tries").min(1).max(50).declare().value();
+    // when using the short form for int64_t, you have to specify the value as a 64 bit integer (using L or LL suffix) if using literals
+    // otherwise the value will be interpreted as an int
+    int64_t num_tries_long = params.param("num_tries_long", 1L, "Number of tries").min(1).max(50).declare().value();
     std::string frame_id = params.param("frame_id", std::string("base_link"), "TF frame").declare().value();
     bool debug = params.param("debug", false, "Enable debug mode").declare().value();
     double threshold = params.param("threshold", 0.75, "Threshold value").min(0.0).max(1.0).declare().value();

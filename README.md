@@ -62,8 +62,11 @@ value using the `.value()` method.
 auto node = std::make_shared<rclcpp::Node>("param_handler_example");
 hatchbed_common::ParamHandler params(node);
 
-// integer parameter
+// integer parameter (note this will cast the internal ros2 int64_t param to an int in the background (and check bounds))
 int num_tries = params.param("num_tries", 1, "Number of tries").min(1).max(50).declare().value();
+
+// integer parameter (int64_t)
+int64_t num_tries_long = params.param("num_tries_long", 1L, "Number of tries").min(1).max(50).declare().value();
 
 // string parameter
 std::string frame_id = params.param("frame_id", std::string("base_link"), "TF frame").declare().value();
@@ -88,16 +91,12 @@ The Param Handler can also handle lists of values for parameters. ROS doesn't su
 ```
 auto node = std::make_shared<rclcpp::Node>("param_handler_example");
 hatchbed_common::ParamHandler params(node);
-
 // integer array parameter
 std::vector<int64_t> int_params = params.param("int_params", std::vector<int64_t>{1, 2, 3}, "Integer array").declare().value();
-
 // double array parameter
 std::vector<double> double_params = params.param("double_params", std::vector<double>{0.1, 0.2, 0.3}, "Double array").declare().value();
-
 // string array parameter
 std::vector<std::string> string_params = params.param("string_params", std::vector<std::string>{"a", "b", "c"}, "String array").declare().value();
-
 // bool array parameter
 std::vector<bool> bool_params = params.param("bool_params", std::vector<bool>{true, false, true}, "Boolean array").declare().value();
 ```

@@ -128,7 +128,7 @@ class ParamHandler {
      *
      * @returns the value of the parameter.
      */
-    BoolParameter& param(const std::string& name, const bool& default_val, const std::string& description) {
+    BoolParameter& param(const std::string& name, bool default_val, const std::string& description) {
         std::scoped_lock lock(mutex_);
         bool_params_[name] = BoolParameter(nullptr, namespace_, name, default_val, description, node_);
         return bool_params_[name];
@@ -149,7 +149,7 @@ class ParamHandler {
      *
      * @returns the value of the parameter.
      */
-    BoolParameter& param(bool* param, const std::string& name, const bool& default_val, const std::string& description) {
+    BoolParameter& param(bool* param, const std::string& name, bool default_val, const std::string& description) {
         std::scoped_lock lock(mutex_);
         bool_params_[name] = BoolParameter(param, namespace_, name, default_val, description, node_);
         return bool_params_[name];
@@ -192,7 +192,10 @@ class ParamHandler {
     }
 
     /**
-     * Register an integer parameter and return its value.
+     * Register a system integer parameter and return its value.
+     *
+     * NOTE: Since ROS2 internally only uses int64_t for params, this version casts int64_t to int. It does check if the 
+     *       value is within the int range, and will fail to update the parameter internally if it's not.
      *
      * @param[in] name         Parameter name
      * @param[in] default_val  Default parameter value
@@ -200,15 +203,54 @@ class ParamHandler {
      *
      * @returns the value of the parameter.
      */
-    IntParameter& param(const std::string& name, const int64_t& default_val, const std::string& description) {
+    SystemIntParameter& param(const std::string& name, int default_val, const std::string& description) {
+        std::scoped_lock lock(mutex_);
+        system_int_params_[name] = SystemIntParameter(nullptr, namespace_, name, default_val, description, node_);
+        return system_int_params_[name];
+    }
+
+    /**
+     * Register a system integer parameter and return its value.
+     * 
+     * NOTE: Since ROS2 internally only uses int64_t for params, this version casts int64_t to int. It does check if the 
+     *       value is within the int range, and will fail to update the parameter internally if it's not.
+     *
+     * NOTE: This version is only recommended for single threaded applications since the user provided parameter
+     *       pointer won't be fully guarded from concurrent usage.
+     *
+     *       The point should also remain valid for the life of the handler.
+     *
+     * @param[out] param       Reference to parameter variable
+     * @param[in] name         Parameter name
+     * @param[in] default_val  Default parameter value
+     * @param[in] description  Parameter description
+     *
+     * @returns the value of the parameter.
+     */
+    SystemIntParameter& param(int* param, const std::string& name, int default_val, const std::string& description) {
+        std::scoped_lock lock(mutex_);
+        system_int_params_[name] = SystemIntParameter(param, namespace_, name, default_val, description, node_);
+        return system_int_params_[name];
+    }
+
+    /**
+     * Register a integer parameter and return its value.
+     *
+     * @param[in] name         Parameter name
+     * @param[in] default_val  Default parameter value
+     * @param[in] description  Parameter description
+     *
+     * @returns the value of the parameter.
+     */
+    IntParameter& param(const std::string& name, int64_t default_val, const std::string& description) {
         std::scoped_lock lock(mutex_);
         int_params_[name] = IntParameter(nullptr, namespace_, name, default_val, description, node_);
         return int_params_[name];
     }
 
     /**
-     * Register an integer parameter and return its value.
-     *
+     * Register a integer parameter and return its value.
+     * 
      * NOTE: This version is only recommended for single threaded applications since the user provided parameter
      *       pointer won't be fully guarded from concurrent usage.
      *
@@ -221,53 +263,10 @@ class ParamHandler {
      *
      * @returns the value of the parameter.
      */
-    IntParameter& param(int64_t* param, const std::string& name, const int64_t& default_val, const std::string& description) {
+    IntParameter& param(int64_t* param, const std::string& name, int64_t default_val, const std::string& description) {
         std::scoped_lock lock(mutex_);
         int_params_[name] = IntParameter(param, namespace_, name, default_val, description, node_);
         return int_params_[name];
-    }
-
-
-    /**
-     * Register an integer parameter and return its value.
-     *
-     * NOTE: This version is uses the ambiguous system int type. If full 64 bit range is required, use IntParameter signature (literals need to be specified as int64_t).
-     *
-     * NOTE: This version is uses the ambiguous system int type. It's preferred to use the IntParameter version (int64_t)
-     *
-     * @param[in] name         Parameter name
-     * @param[in] default_val  Default parameter value
-     * @param[in] description  Parameter description
-     *
-     * @returns the value of the parameter.
-     */
-    IntSystemParameter& param(const std::string& name, const int& default_val, const std::string& description) {
-        std::scoped_lock lock(mutex_);
-        int_system_params_[name] = IntSystemParameter(nullptr, namespace_, name, default_val, description, node_);
-        return int_system_params_[name];
-    }
-
-    /**
-     * Register an integer parameter and return its value.
-     *
-     * NOTE: This version is uses the ambiguous system int type. If full 64 bit range is required, use IntParameter.
-     *
-     * NOTE: This version is only recommended for single threaded applications since the user provided parameter
-     *       pointer won't be fully guarded from concurrent usage.
-     *
-     *       The point should also remain valid for the life of the handler.
-     *
-     * @param[out] param       Reference to parameter variable
-     * @param[in] name         Parameter name
-     * @param[in] default_val  Default parameter value
-     * @param[in] description  Parameter description
-     *
-     * @returns the value of the parameter.
-     */
-    IntSystemParameter& param(int* param, const std::string& name, const int& default_val, const std::string& description) {
-        std::scoped_lock lock(mutex_);
-        int_system_params_[name] = IntSystemParameter(param, namespace_, name, default_val, description, node_);
-        return int_system_params_[name];
     }
 
     /**
@@ -315,7 +314,7 @@ class ParamHandler {
      *
      * @returns the value of the parameter.
      */
-    DoubleParameter& param(const std::string& name, const double& default_val, const std::string& description) {
+    DoubleParameter& param(const std::string& name, double default_val, const std::string& description) {
         std::scoped_lock lock(mutex_);
         double_params_[name] = DoubleParameter(nullptr, namespace_, name, default_val, description, node_);
         return double_params_[name];
@@ -336,7 +335,7 @@ class ParamHandler {
      *
      * @returns the value of the parameter.
      */
-    DoubleParameter& param(double* param, const std::string& name, const double& default_val, const std::string& description) {
+    DoubleParameter& param(double* param, const std::string& name, double default_val, const std::string& description) {
         std::scoped_lock lock(mutex_);
         double_params_[name] = DoubleParameter(param, namespace_, name, default_val, description, node_);
         return double_params_[name];
@@ -415,7 +414,7 @@ class ParamHandler {
     }
 
     /**
-     * Register a string array parameter and return its value.
+     * Register a string parameter and return its value.
      *
      * @param[in] name         Parameter name
      * @param[in] default_val  Default parameter value
@@ -430,7 +429,7 @@ class ParamHandler {
     }
 
     /**
-     * Register a string array parameter and return its value.
+     * Register a string parameter and return its value.
      *
      * NOTE: This version is only recommended for single threaded applications since the user provided parameter
      *       pointer won't be fully guarded from concurrent usage.
@@ -467,8 +466,8 @@ private:
   std::unordered_map<std::string, BoolArrayParameter> bool_array_params_;
   std::unordered_map<std::string, DoubleParameter> double_params_;
   std::unordered_map<std::string, DoubleArrayParameter> double_array_params_;
+  std::unordered_map<std::string, SystemIntParameter> system_int_params_;
   std::unordered_map<std::string, IntParameter> int_params_;
-  std::unordered_map<std::string, IntSystemParameter> int_system_params_;
   std::unordered_map<std::string, IntArrayParameter> int_array_params_;
   std::unordered_map<std::string, StringParameter> string_params_;
   std::unordered_map<std::string, StringArrayParameter> string_array_params_;
@@ -537,16 +536,23 @@ private:
                     result.successful = false;
                     result.reason = "Failed to update parameter: " + int_param->first;
                 }
-            } else {
+            }
+            else {
                 // the parameter is not registered as int64_t, so we need to check if it's registered as system int
-                auto int_system_param = int_system_params_.find(param.get_name());
-                if (int_system_param != int_system_params_.end()) {
-                    if (int_system_param->second.update(param.as_int(), true)) {
-                        result.successful = true;
-                        result.reason = "success";
+                auto int_system_param = system_int_params_.find(param.get_name());
+                if (int_system_param != system_int_params_.end()) {
+                    if (param.as_int() >= std::numeric_limits<int>::min() && param.as_int() <= std::numeric_limits<int>::max()) {
+                        if (int_system_param->second.update(static_cast<int>(param.as_int()), true)) {
+                            result.successful = true;
+                            result.reason = "success";
+                        } else {
+                            result.successful = false;
+                            result.reason = "Failed to update parameter: " + int_system_param->first;
+                        }
                     } else {
+                        // unsafe to cast to int
                         result.successful = false;
-                        result.reason = "Failed to update parameter: " + int_system_param->first;
+                        result.reason = "Failed to update parameter: " + int_system_param->first + " (unsafe to cast to int)";
                     }
                 }
             }
