@@ -234,7 +234,7 @@ class ParamHandler {
     }
 
     /**
-     * Register a integer parameter and return its value.
+     * Register an integer parameter and return its value.
      *
      * @param[in] name         Parameter name
      * @param[in] default_val  Default parameter value
@@ -249,7 +249,7 @@ class ParamHandler {
     }
 
     /**
-     * Register a integer parameter and return its value.
+     * Register an integer parameter and return its value.
      * 
      * NOTE: This version is only recommended for single threaded applications since the user provided parameter
      *       pointer won't be fully guarded from concurrent usage.
