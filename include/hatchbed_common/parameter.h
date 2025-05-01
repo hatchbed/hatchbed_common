@@ -201,7 +201,7 @@ class Parameter {
         return true;
     }
 
-    // general case
+    // general case ss works for all basic types
     template<typename U>
     std::string toString(const U& value) const {
         std::stringstream ss;
@@ -209,7 +209,8 @@ class Parameter {
         return ss.str();
     }
 
-    // overload for bool
+    // overload for bool (ss will just set 1 or 0 for true/false)
+    // instead, this overload returns true/false
     std::string toString(const bool& value) const {
         return value ? "true" : "false";
     }
@@ -326,10 +327,8 @@ class NumericParameter : public Parameter<T> {
         return max_;
     }
 
-    // general case
-    template<typename V>
-    V clamp(const V& value) const {
-        V clamped = value;
+    U clamp(const U& value) const {
+        U clamped = value;
 
         if (has_range_ && clamped < min_) {
             clamped = min_;
@@ -341,10 +340,8 @@ class NumericParameter : public Parameter<T> {
         return clamped;
     }
 
-    // overload for vector
-    template<typename V>
-    std::vector<V> clamp(const std::vector<V>& values) const {
-        std::vector<V> clamped;
+    std::vector<U> clamp(const std::vector<U>& values) const {
+        std::vector<U> clamped;
         for (const auto& value : values) {
             clamped.push_back(clamp(value));
         }
@@ -352,9 +349,7 @@ class NumericParameter : public Parameter<T> {
     }
 
     protected:
-    // general case
-    template<typename V>
-    bool checkRange(const V& value) const {
+    bool checkRange(const U& value) const {
         if (has_range_ && (value < min_ || value > max_)) {
             RCLCPP_WARN_STREAM(this->node_->get_logger(),  this->namespace_ << "/" << this->name_
                                << ": value out of range <" << value << ">");
@@ -363,9 +358,7 @@ class NumericParameter : public Parameter<T> {
         return true;
     }
 
-    // overload for vector
-    template<typename V>
-    bool checkRange(const std::vector<V>& values) const {
+    bool checkRange(const std::vector<U>& values) const {
         for (const auto& value : values) {
             if (!checkRange(value)) {
                 return false;
