@@ -103,7 +103,7 @@ class ParamHandler {
         }
 
         param("verbose", is_verbose, "Enable debug logging").callback([this](const bool& value) {
-            RCLCPP_INFO_STREAM(node_->get_logger(), "setting verbose logging: " << value);
+            RCLCPP_INFO_STREAM(node_->get_logger(), "setting verbose logging: " << (value ? "true" : "false"));
             if (value) {
                 auto ret = rcutils_logging_set_logger_level(node_->get_logger().get_name(), RCUTILS_LOG_SEVERITY_DEBUG);
                 if (ret != RCUTILS_RET_OK) {
@@ -474,17 +474,17 @@ private:
 
   rcl_interfaces::msg::SetParametersResult parametersCallback(const std::vector<rclcpp::Parameter> &parameters) {
     rcl_interfaces::msg::SetParametersResult result;
-    result.successful = false;
-    result.reason = "parameter not found";
+    // default to successful
+    // otherwise parameters that weren't created using this handler will print a warning
+    // any parameter created using this handler will be checked
+    result.successful = true;
+    result.reason = "success";
 
     for (const auto &param: parameters) {
         if (param.get_type() == rclcpp::ParameterType::PARAMETER_BOOL) {
             auto bool_param = bool_params_.find(param.get_name());
             if (bool_param != bool_params_.end()) {
-                if (bool_param->second.update(param.as_bool(), true)) {
-                    result.successful = true;
-                    result.reason = "success";
-                } else {
+                if (!bool_param->second.update(param.as_bool(), true)) {
                     result.successful = false;
                     result.reason = "Failed to update parameter: " + bool_param->first;
                 }
@@ -493,10 +493,7 @@ private:
         else if (param.get_type() == rclcpp::ParameterType::PARAMETER_BOOL_ARRAY) {
             auto bool_array_param = bool_array_params_.find(param.get_name());
             if (bool_array_param != bool_array_params_.end()) {
-                if (bool_array_param->second.update(param.as_bool_array(), true)) {
-                    result.successful = true;
-                    result.reason = "success";
-                } else {
+                if (!bool_array_param->second.update(param.as_bool_array(), true)) {
                     result.successful = false;
                     result.reason = "Failed to update parameter: " + bool_array_param->first;
                 }
@@ -505,10 +502,7 @@ private:
         else if (param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE) {
             auto double_param = double_params_.find(param.get_name());
             if (double_param != double_params_.end()) {
-                if (double_param->second.update(param.as_double(), true)) {
-                    result.successful = true;
-                    result.reason = "success";
-                } else {
+                if (!double_param->second.update(param.as_double(), true)) {
                     result.successful = false;
                     result.reason = "Failed to update parameter: " + double_param->first;
                 }
@@ -517,10 +511,7 @@ private:
         else if (param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE_ARRAY) {
             auto double_array_param = double_array_params_.find(param.get_name());
             if (double_array_param != double_array_params_.end()) {
-                if (double_array_param->second.update(param.as_double_array(), true)) {
-                    result.successful = true;
-                    result.reason = "success";
-                } else {
+                if (!double_array_param->second.update(param.as_double_array(), true)) {
                     result.successful = false;
                     result.reason = "Failed to update parameter: " + double_array_param->first;
                 }
@@ -529,30 +520,23 @@ private:
         else if (param.get_type() == rclcpp::ParameterType::PARAMETER_INTEGER) {
             auto int_param = int_params_.find(param.get_name());
             if (int_param != int_params_.end()) {
-                if (int_param->second.update(param.as_int(), true)) {
-                    result.successful = true;
-                    result.reason = "success";
-                } else {
+                if (!int_param->second.update(param.as_int(), true)) {
                     result.successful = false;
                     result.reason = "Failed to update parameter: " + int_param->first;
                 }
-            }
-            else {
+            } else {
                 // the parameter is not registered as int64_t, so we need to check if it's registered as system int
                 auto int_system_param = system_int_params_.find(param.get_name());
                 if (int_system_param != system_int_params_.end()) {
                     if (param.as_int() >= std::numeric_limits<int>::min() && param.as_int() <= std::numeric_limits<int>::max()) {
-                        if (int_system_param->second.update(static_cast<int>(param.as_int()), true)) {
-                            result.successful = true;
-                            result.reason = "success";
-                        } else {
+                        if (!int_system_param->second.update(static_cast<int>(param.as_int()), true)) {
                             result.successful = false;
                             result.reason = "Failed to update parameter: " + int_system_param->first;
                         }
                     } else {
                         // unsafe to cast to int
                         result.successful = false;
-                        result.reason = "Failed to update parameter: " + int_system_param->first + " (unsafe to cast to int)";
+                        result.reason = "Failed to update parameter: " + int_system_param->first + " (value too large to cast from 'int64_t' to 'int')";
                     }
                 }
             }
@@ -560,10 +544,7 @@ private:
         else if (param.get_type() == rclcpp::ParameterType::PARAMETER_INTEGER_ARRAY) {
             auto int_array_param = int_array_params_.find(param.get_name());
             if (int_array_param != int_array_params_.end()) {
-                if (int_array_param->second.update(param.as_integer_array(), true)) {
-                    result.successful = true;
-                    result.reason = "success";
-                } else {
+                if (!int_array_param->second.update(param.as_integer_array(), true)) {
                     result.successful = false;
                     result.reason = "Failed to update parameter: " + int_array_param->first;
                 }
@@ -572,10 +553,7 @@ private:
         else if (param.get_type() == rclcpp::ParameterType::PARAMETER_STRING) {
             auto string_param = string_params_.find(param.get_name());
             if (string_param != string_params_.end()) {
-                if (string_param->second.update(param.as_string(), true)) {
-                    result.successful = true;
-                    result.reason = "success";
-                } else {
+                if (!string_param->second.update(param.as_string(), true)) {
                     result.successful = false;
                     result.reason = "Failed to update parameter: " + string_param->first;
                 }
@@ -584,10 +562,7 @@ private:
         else if (param.get_type() == rclcpp::ParameterType::PARAMETER_STRING_ARRAY) {
             auto string_array_param = string_array_params_.find(param.get_name());
             if (string_array_param != string_array_params_.end()) {
-                if (string_array_param->second.update(param.as_string_array(), true)) {
-                    result.successful = true;
-                    result.reason = "success";
-                } else {
+                if (!string_array_param->second.update(param.as_string_array(), true)) {
                     result.successful = false;
                     result.reason = "Failed to update parameter: " + string_array_param->first;
                 }

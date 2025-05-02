@@ -46,10 +46,10 @@ When registering a parameter it is possible to chain additional configuration
 items to the parameter, such as:
   - `.callback()`: provide a callback function when the parameter changes, implies `.dynamic()`
   - `.dynamic()`: allow the parameter to by modified with dynamic reconfig
-  - `.enum()`: specify an enumeration for integer parameters
-  - `.max()`: specify a maximum value for numeric parameters
-  - `.min()`: specify a minimun value for numeric parameters
-  - `.step()`: specify a step size for numeric parameters
+  - `.enum()`: specify an enumeration for integer and integer array (per element) parameters
+  - `.max()`: specify a maximum value for numeric and numeric array (per element) parameters
+  - `.min()`: specify a minimun value for numeric and numeric array (per element) parameters
+  - `.step()`: specify a step size for numeric and numeric array (per element) parameters
 
 Once the parameter has been configured, it's necessary to call the `.declare()` method.
 
@@ -66,6 +66,8 @@ hatchbed_common::ParamHandler params(node);
 int num_tries = params.param("num_tries", 1, "Number of tries").min(1).max(50).declare().value();
 
 // integer parameter (int64_t)
+// When using the short form (non pointer overload) for int64_t, you have to specify the value as a 64 bit integer 
+// (using L or LL suffix) if using literals. Otherwise the value will be interpreted as an int
 int64_t num_tries_long = params.param("num_tries_long", 1L, "Number of tries").min(1).max(50).declare().value();
 
 // string parameter
@@ -92,13 +94,13 @@ The Param Handler can also handle lists of values for parameters. ROS doesn't su
 auto node = std::make_shared<rclcpp::Node>("param_handler_example");
 hatchbed_common::ParamHandler params(node);
 // integer array parameter
-std::vector<int64_t> int_params = params.param("int_params", std::vector<int64_t>{1, 2, 3}, "Integer array").declare().value();
+std::vector<int64_t> num_tries_list = params.param("num_tries_list", std::vector<int64_t>{1, 2, 3}, "Number of tries list").min(0).max(10).declare().value();
 // double array parameter
-std::vector<double> double_params = params.param("double_params", std::vector<double>{0.1, 0.2, 0.3}, "Double array").declare().value();
+std::vector<double> thresholds = params.param("thresholds", std::vector<double>{0.75, 0.1, 0.24}, "Thresholds").min(0.0).max(1.0).declare().value();
 // string array parameter
-std::vector<std::string> string_params = params.param("string_params", std::vector<std::string>{"a", "b", "c"}, "String array").declare().value();
+std::vector<std::string> topic_list = params.param("topic_list", std::vector<std::string>{"/topic1", "topic2", "/namespace/topic3"}, "Topic list").declare().value();
 // bool array parameter
-std::vector<bool> bool_params = params.param("bool_params", std::vector<bool>{true, false, true}, "Boolean array").declare().value();
+std::vector<bool> debug_list = params.param("debug_list", std::vector<bool>{true, false, true}, "Enable debug mode list").declare().value();
 ```
 
 #### Dynamic Parameters
@@ -112,8 +114,9 @@ parameter should be stored:
 int num_tries = 0;
 params.param(&num_tries, "num_tries", 1, "Number of tries").min(1).max(50).dynamic().declare();
 
-std::vector<double> dynamic_double_params;
-params.param(&dynamic_double_params, "dynamic_double_params", std::vector<double>{0.1, 0.2, 0.3}, "Dynamic double array").dynamic().declare();
+std::vector<double> thresholds;
+params.param(&thresholds, "thresholds", std::vector<double>{0.85, 0.9, 0.03},
+             "A list of dynamic thresholds").min(0.0).max(1.0).step(0.01).dynamic().declare().value();
 
 while (rclcpp::ok()) {
     process.execute(num_tries, dynamic_double_params);
@@ -130,6 +133,9 @@ data access.
 
 ```
 auto num_tries = params.param("num_tries", 1, "Number of tries").min(1).max(50).dynamic().declare();
+auto thresholds = params.param("thresholds",
+                               std::vector<double>{0.85, 0.9, 0.03},
+                               "A list of dynamic thresholds").min(0.0).max(1.0).step(0.01).dynamic().declare().value();
 
 std::thread t([&](){
     while (rclcpp::ok()) {

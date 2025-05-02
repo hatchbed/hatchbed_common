@@ -72,9 +72,21 @@ struct EnumOption {
 
 class ParamHandler;
 
+template <typename T>
+struct value_type_of {
+    using type = T; // Default: scalar types stay unchanged
+};
+
+template <typename T, typename U>
+struct value_type_of<std::vector<T, U>> {
+    using type = T; // Specialization for std::vector
+};
+
 template <class T>
 class Parameter {
     public:
+    using U = typename value_type_of<T>::type;
+
     class Declared {
         public:
         Declared(const Parameter& param) : param_(param) {}
@@ -201,28 +213,27 @@ class Parameter {
         return true;
     }
 
-    // general case ss works for all basic types
-    template<typename U>
-    std::string toString(const U& value) const {
-        std::stringstream ss;
-        ss << value;
-        return ss.str();
+    // overloaded base type
+    virtual std::string toString(const U& value) const {
+        if constexpr (std::is_same_v<U, bool>) {
+            // bool is a special common case
+            // other special cases are handled in the child classes
+            return value ? "true" : "false";
+        } else {
+            // general case ss works for all basic types
+            std::stringstream ss;
+            ss << value;
+            return ss.str();
+        }
     }
 
-    // overload for bool (ss will just set 1 or 0 for true/false)
-    // instead, this overload returns true/false
-    std::string toString(const bool& value) const {
-        return value ? "true" : "false";
-    }
-
-    // overload for vector
-    template<typename U>
-    std::string toString(const std::vector<U>& values) const {
+    // overloaded for vector
+    virtual std::string toString(const std::vector<U>& values) const {
         std::stringstream ss;
         ss << "[";
-        for (const auto& value : values) {
-            ss << toString(value);
-            if (value != values.back()) {
+        for (size_t i = 0; i < values.size(); ++i) {
+            ss << toString(values[i]);
+            if (i != values.size() - 1) {
                 ss << ", ";
             }
         }
@@ -244,7 +255,7 @@ class Parameter {
         }
 
         update(getParameter());
-        RCLCPP_INFO_STREAM(this->node_->get_logger(), this->namespace_ << "/" << this->name_ << ": " << toString(this->value()));
+        RCLCPP_INFO_STREAM(node_->get_logger(), namespace_ << "/" << name_ << ": " << toString(value()));
         initialized_ = true;
     }
 
@@ -268,8 +279,10 @@ class Parameter {
     friend class ParamHandler;
 };
 
-template <typename T, typename U=T>
+template <typename T>
 class NumericParameter : public Parameter<T> {
+    using U = typename value_type_of<T>::type;
+
     public:
     NumericParameter(T* store, const std::string& ns, const std::string& name, T default_val,
                      const std::string& description, std::shared_ptr<rclcpp::Node> node)
@@ -279,17 +292,17 @@ class NumericParameter : public Parameter<T> {
     NumericParameter(const NumericParameter& parameter) = default;
     virtual ~NumericParameter() = default;
 
-    virtual NumericParameter<T, U>& callback(std::function<void(T)> callback) override {
+    virtual NumericParameter<T>& callback(std::function<void(T)> callback) override {
         Parameter<T>::callback(callback);
         return *this;
     }
 
-    virtual NumericParameter<T, U>& dynamic() override {
+    virtual NumericParameter<T>& dynamic() override {
         Parameter<T>::dynamic();
         return *this;
     }
 
-    virtual NumericParameter<T, U>& min(U min) {
+    virtual NumericParameter<T>& min(U min) {
         min_ = min;
         has_range_ = true;
         if (max_ < min_) {
@@ -299,7 +312,7 @@ class NumericParameter : public Parameter<T> {
         return *this;
     }
 
-    virtual NumericParameter<T, U>& max(U max) {
+    virtual NumericParameter<T>& max(U max) {
         max_ = max;
         has_range_ = true;
         if (min_ > max_) {
@@ -309,7 +322,7 @@ class NumericParameter : public Parameter<T> {
         return *this;
     }
 
-    virtual NumericParameter<T, U>& step(U step) {
+    virtual NumericParameter<T>& step(U step) {
         step_ = step;
         return *this;
     }
@@ -408,49 +421,51 @@ class NumericParameter : public Parameter<T> {
 };
 
 // Specialization for int (extends enum handling)
-template <typename T, typename U=T>
-class NumericIntParameter : public NumericParameter<T, U> {
+template <typename T>
+class NumericIntParameter : public NumericParameter<T> {
+    using U = typename value_type_of<T>::type;
+
     public:
     NumericIntParameter(T* store, const std::string& ns, const std::string& name, T default_val,
                         const std::string& description, std::shared_ptr<rclcpp::Node> node)
-      : NumericParameter<T, U>(store, ns, name, default_val, description, node) {}
+      : NumericParameter<T>(store, ns, name, default_val, description, node) {}
 
     NumericIntParameter() = default;
     NumericIntParameter(const NumericIntParameter& parameter) = default;
     virtual ~NumericIntParameter() = default;
 
-    virtual NumericIntParameter<T, U>& callback(std::function<void(T)> callback) override {
-        NumericParameter<T, U>::callback(callback);
+    virtual NumericIntParameter<T>& callback(std::function<void(T)> callback) override {
+        NumericParameter<T>::callback(callback);
         return *this;
     }
 
-    virtual NumericIntParameter<T, U>& dynamic() override {
-        NumericParameter<T, U>::dynamic();
+    virtual NumericIntParameter<T>& dynamic() override {
+        NumericParameter<T>::dynamic();
         return *this;
     }
 
-    virtual NumericIntParameter<T, U>& min(U min) override {
+    virtual NumericIntParameter<T>& min(U min) override {
         if (enums_.empty()) {
-            NumericParameter<T, U>::min(min);
+            NumericParameter<T>::min(min);
         }
         return *this;
     }
 
-    virtual NumericIntParameter<T, U>& max(U max) override {
+    virtual NumericIntParameter<T>& max(U max) override {
         if (enums_.empty()) {
-            NumericParameter<T, U>::max(max);
+            NumericParameter<T>::max(max);
         }
         return *this;
     }
 
-    virtual NumericIntParameter<T, U>& step(U step) {
+    virtual NumericIntParameter<T>& step(U step) override {
         if (enums_.empty()) {
-            NumericParameter<T, U>::step(step);
+            NumericParameter<T>::step(step);
         }
         return *this;
     }
 
-    virtual NumericIntParameter<T, U>& enumerate(const std::vector<EnumOption<U>>& enums) {
+    virtual NumericIntParameter<T>& enumerate(const std::vector<EnumOption<U>>& enums) {
         enums_ = enums;
         if (!enums_.empty()) {
             this->has_range_ = false;
@@ -490,19 +505,19 @@ class NumericIntParameter : public NumericParameter<T, U> {
 
     protected:
     virtual bool update(const T& value, bool from_callback = false) {
-        if (enums_.empty()) {
-            return NumericParameter<T, U>::update(value, from_callback);
-        }
-
-        if (!checkEnum(value)) {
+        if (!enums_.empty() && !checkEnum(value)) {
             return false;
         }
 
-        return Parameter<T>::update(value, from_callback);
+        return NumericParameter<T>::update(value, from_callback);
     }
 
-    // overload for U
-    std::string toString(const U& value) const {
+    // re-use the parent class toString method for any signatures
+    // not overridden in this class
+    // (.i.e. this allows us to re-use the parent class method for vector types)
+    using NumericParameter<T>::toString;
+
+    virtual std::string toString(const U& value) const override {
         std::stringstream ss;
         ss << value;
         for (const auto& option: enums_) {
@@ -510,20 +525,6 @@ class NumericIntParameter : public NumericParameter<T, U> {
                 ss << " (" + option.name + ")";
             }
         }
-        return ss.str();
-    }
-
-    // overload for vector U
-    std::string toString(const std::vector<U>& values) const {
-        std::stringstream ss;
-        ss << "[";
-        for (const auto& value : values) {
-            ss << toString(value);
-            if (value != values.back()) {
-                ss << ", ";
-            }
-        }
-        ss << "]";
         return ss.str();
     }
 
@@ -573,9 +574,9 @@ template class Parameter<std::string>;
 template class Parameter<std::vector<std::string>>;
 template class NumericIntParameter<int>;
 template class NumericIntParameter<int64_t>;
-template class NumericIntParameter<std::vector<int64_t>, int64_t>;
+template class NumericIntParameter<std::vector<int64_t>>;
 template class NumericParameter<double>;
-template class NumericParameter<std::vector<double>, double>;
+template class NumericParameter<std::vector<double>>;
 
 typedef Parameter<bool> BoolParameter;
 typedef Parameter<std::vector<bool>> BoolArrayParameter;
@@ -583,8 +584,8 @@ typedef Parameter<std::string> StringParameter;
 typedef Parameter<std::vector<std::string>> StringArrayParameter;
 typedef NumericIntParameter<int> SystemIntParameter; // support for legacy int parameters, they are stil int64_t in ROS, though
 typedef NumericIntParameter<int64_t> IntParameter;
-typedef NumericIntParameter<std::vector<int64_t>, int64_t> IntArrayParameter;
+typedef NumericIntParameter<std::vector<int64_t>> IntArrayParameter;
 typedef NumericParameter<double> DoubleParameter;
-typedef NumericParameter<std::vector<double>, double> DoubleArrayParameter;
+typedef NumericParameter<std::vector<double>> DoubleArrayParameter;
 
 }  // namespace hatchbed_common
