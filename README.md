@@ -1,6 +1,6 @@
 # hatchbed_common
 
-Common Hatchbed C++ utility code for ROS, such registering and handling updates to ros parameters.
+Common Hatchbed C++ utility code for ROS, such as registering and handling updates to ros parameters.
 
 ## Param Handler
 
