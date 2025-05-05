@@ -16,6 +16,10 @@ add_executable(example_node example/example_node.cpp)
 set_property(TARGET example_node PROPERTY CXX_STANDARD 17)
 ament_target_dependencies(example_node rclcpp)
 
+install(TARGETS example_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 ament_export_include_directories(include)
 ament_export_dependencies(rclcpp)
 ament_package()

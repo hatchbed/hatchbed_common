@@ -1,6 +1,6 @@
 # hatchbed_common
 
-Common Hatchbed C++ utility code for ROS, such registering and handling updates to ros parameters.
+Common Hatchbed C++ utility code for ROS, such as registering and handling updates to ros parameters.
 
 ## Param Handler
 
@@ -46,10 +46,10 @@ When registering a parameter it is possible to chain additional configuration
 items to the parameter, such as:
   - `.callback()`: provide a callback function when the parameter changes, implies `.dynamic()`
   - `.dynamic()`: allow the parameter to by modified with dynamic reconfig
-  - `.enum()`: specify an enumeration for integer parameters
-  - `.max()`: specify a maximum value for numeric parameters
-  - `.min()`: specify a minimun value for numeric parameters
-  - `.step()`: specify a step size for numeric parameters
+  - `.enum()`: specify an enumeration for integer and integer array (per element) parameters
+  - `.max()`: specify a maximum value for numeric and numeric array (per element) parameters
+  - `.min()`: specify a minimun value for numeric and numeric array (per element) parameters
+  - `.step()`: specify a step size for numeric and numeric array (per element) parameters
 
 Once the parameter has been configured, it's necessary to call the `.declare()` method.
 
@@ -62,8 +62,13 @@ value using the `.value()` method.
 auto node = std::make_shared<rclcpp::Node>("param_handler_example");
 hatchbed_common::ParamHandler params(node);
 
-// integer parameter
+// integer parameter (note this will cast the internal ros2 int64_t param to an int in the background (and check bounds))
 int num_tries = params.param("num_tries", 1, "Number of tries").min(1).max(50).declare().value();
+
+// integer parameter (int64_t)
+// When using the short form (non pointer overload) for int64_t, you have to specify the value as a 64 bit integer 
+// (using L or LL suffix) if using literals. Otherwise the value will be interpreted as an int
+int64_t num_tries_long = params.param("num_tries_long", 1L, "Number of tries").min(1).max(50).declare().value();
 
 // string parameter
 std::string frame_id = params.param("frame_id", std::string("base_link"), "TF frame").declare().value();
@@ -81,6 +86,23 @@ int mode = params.param("mode", 0, "Operating mode").enumerate({
     {20, "Legacy", "Legacy operating mode"}}).declare().value();
 ```
 
+#### Array Parameters
+
+The Param Handler can also handle lists of values for parameters. ROS doesn't support range/step constraints for numeric arrays, so the min/max/step methods are not available for the numeric arrays. If ROS adds support for array constraints this will be updated.
+
+```
+auto node = std::make_shared<rclcpp::Node>("param_handler_example");
+hatchbed_common::ParamHandler params(node);
+// integer array parameter
+std::vector<int64_t> num_tries_list = params.param("num_tries_list", std::vector<int64_t>{1, 2, 3}, "Number of tries list").min(0).max(10).declare().value();
+// double array parameter
+std::vector<double> thresholds = params.param("thresholds", std::vector<double>{0.75, 0.1, 0.24}, "Thresholds").min(0.0).max(1.0).declare().value();
+// string array parameter
+std::vector<std::string> topic_list = params.param("topic_list", std::vector<std::string>{"/topic1", "topic2", "/namespace/topic3"}, "Topic list").declare().value();
+// bool array parameter
+std::vector<bool> debug_list = params.param("debug_list", std::vector<bool>{true, false, true}, "Enable debug mode list").declare().value();
+```
+
 #### Dynamic Parameters
 
 For dynamic parameters, there are several options.
@@ -92,14 +114,18 @@ parameter should be stored:
 int num_tries = 0;
 params.param(&num_tries, "num_tries", 1, "Number of tries").min(1).max(50).dynamic().declare();
 
+std::vector<double> thresholds;
+params.param(&thresholds, "thresholds", std::vector<double>{0.85, 0.9, 0.03},
+             "A list of dynamic thresholds").min(0.0).max(1.0).step(0.01).dynamic().declare().value();
+
 while (rclcpp::ok()) {
-    process.execute(num_tries);
+    process.execute(num_tries, dynamic_double_params);
     rclcpp::spin_some(node);
 }
 
 ```
 
-Here the `num_tries` int variable will be automatically updated.
+Here the `num_tries` int and `dynamic_double_params` std::vector<double> variables will be automatically updated.
 
 When multi-threading is involved the above method is not recommended.  Instead
 the parameter object returned by the handler should be used to ensure thread-safe
@@ -107,6 +133,9 @@ data access.
 
 ```
 auto num_tries = params.param("num_tries", 1, "Number of tries").min(1).max(50).dynamic().declare();
+auto thresholds = params.param("thresholds",
+                               std::vector<double>{0.85, 0.9, 0.03},
+                               "A list of dynamic thresholds").min(0.0).max(1.0).step(0.01).dynamic().declare().value();
 
 std::thread t([&](){
     while (rclcpp::ok()) {
