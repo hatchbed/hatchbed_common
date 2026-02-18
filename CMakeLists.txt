@@ -14,7 +14,9 @@ include_directories(
 
 add_executable(example_node example/example_node.cpp)
 set_property(TARGET example_node PROPERTY CXX_STANDARD 17)
-ament_target_dependencies(example_node rclcpp)
+target_link_libraries(example_node
+  rclcpp::rclcpp
+)
 
 install(TARGETS example_node
   DESTINATION lib/${PROJECT_NAME}
