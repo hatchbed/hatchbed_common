@@ -2,6 +2,11 @@
 Changelog for package hatchbed_common
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Replace ament_target_dependencies with target_link_libraries.
+* Contributors: Marc Alban
+
 0.1.2 (2025-04-06)
 ------------------
 * Add simple timing profiler utility.
