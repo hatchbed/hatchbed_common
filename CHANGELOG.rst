@@ -2,6 +2,11 @@
 Changelog for package hatchbed_common
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.1.5 (2026-03-29)
+------------------
+* Enable static analysis and linting tests.
+* Contributors: Marc Alban
+
 0.1.4 (2026-02-18)
 ------------------
 * Replace ament_target_dependencies with target_link_libraries.
