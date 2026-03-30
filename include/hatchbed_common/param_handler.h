@@ -1,39 +1,38 @@
-/**
- * Copyright (c) 2022, Hatchbed
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *
- * 1. Redistributions of source code must retain the above copyright notice,
- *    this list of conditions and the following disclaimer.
- *
- * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
- *
- * 3. Neither the name of the copyright holder nor the names of its
- *    contributors may be used to endorse or promote products derived from
- *    this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- */
+// Copyright 2022 Hatchbed L.L.C.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are met:
+//
+//    * Redistributions of source code must retain the above copyright
+//      notice, this list of conditions and the following disclaimer.
+//
+//    * Redistributions in binary form must reproduce the above copyright
+//      notice, this list of conditions and the following disclaimer in the
+//      documentation and/or other materials provided with the distribution.
+//
+//    * Neither the name of the copyright holder nor the names of its
+//      contributors may be used to endorse or promote products derived from
+//      this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
 
 #pragma once
 
+#include <limits>
 #include <mutex>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 #include <hatchbed_common/parameter.h>
 #include <rclcpp/rclcpp.hpp>
@@ -59,13 +58,15 @@ namespace hatchbed_common {
  * When registering a parameter it is possible to chain additional configuration
  * items to the parameter, such as:
  *   * .dynamic() - allow the parameter to by modified with dynamic reconfig
- *   * .callback(func) - provide a callback function when the parameter changes, implies .dynamic()
+ *   * .callback(func) - provide a callback function when the parameter changes,
+ *                       implies .dynamic()
  *   * .min(val) - specify a minimun value for numeric parameters
  *   * .max(val) - specify a maximum value for numeric parameters
  *   * .step(val) - specify step size for numeric parameters
  *   * .enum(list) - specify an enumeration for integer parameters
  *
- * Once the parameter has been configured, it's necessary to call the `.declare()` method.
+ * Once the parameter has been configured, it's necessary to call the
+ * `.declare()` method.
  *
  * The parameter objects values can be accessed in a thread safe way with the
  * .value() method and updated with the .update(val) method.
@@ -74,7 +75,7 @@ namespace hatchbed_common {
  */
 class ParamHandler {
   public:
-    ParamHandler(rclcpp::Node::SharedPtr node) :
+    explicit ParamHandler(rclcpp::Node::SharedPtr node) :
       node_(node),
       namespace_(node_->get_fully_qualified_name()),
       verbose_param_(false)
@@ -102,21 +103,25 @@ class ParamHandler {
             non_verbose_level_ = log_level;
         }
 
-        param("verbose", is_verbose, "Enable debug logging").callback([this](const bool& value) {
-            RCLCPP_INFO_STREAM(node_->get_logger(), "setting verbose logging: " << (value ? "true" : "false"));
-            if (value) {
-                auto ret = rcutils_logging_set_logger_level(node_->get_logger().get_name(), RCUTILS_LOG_SEVERITY_DEBUG);
-                if (ret != RCUTILS_RET_OK) {
-                    RCLCPP_WARN_STREAM(node_->get_logger(), "Failed to set log level to debug");
+        param("verbose", is_verbose, "Enable debug logging").callback(
+            [this](const bool& value) {
+                RCLCPP_INFO_STREAM(node_->get_logger(),
+                    "setting verbose logging: " << (value ? "true" : "false"));
+                if (value) {
+                    auto ret = rcutils_logging_set_logger_level(
+                        node_->get_logger().get_name(), RCUTILS_LOG_SEVERITY_DEBUG);
+                    if (ret != RCUTILS_RET_OK) {
+                        RCLCPP_WARN_STREAM(node_->get_logger(),
+                            "Failed to set log level to debug");
+                    }
+                } else {
+                    auto ret = rcutils_logging_set_logger_level(
+                        node_->get_logger().get_name(), non_verbose_level_);
+                    if (ret != RCUTILS_RET_OK) {
+                        RCLCPP_WARN_STREAM(node_->get_logger(), "Failed to set log level");
+                    }
                 }
-            }
-            else {
-                auto ret = rcutils_logging_set_logger_level(node_->get_logger().get_name(), non_verbose_level_);
-                if (ret != RCUTILS_RET_OK) {
-                    RCLCPP_WARN_STREAM(node_->get_logger(), "Failed to set log level");
-                }
-            }
-        }).declare();
+            }).declare();
     }
 
     /**
@@ -128,17 +133,23 @@ class ParamHandler {
      *
      * @returns the value of the parameter.
      */
-    BoolParameter& param(const std::string& name, bool default_val, const std::string& description) {
+    BoolParameter& param(
+        const std::string& name,
+        bool default_val,
+        const std::string& description)
+    {
         std::scoped_lock lock(mutex_);
-        bool_params_[name] = BoolParameter(nullptr, namespace_, name, default_val, description, node_);
+        bool_params_[name] = BoolParameter(nullptr, namespace_, name, default_val, description,
+            node_);
         return bool_params_[name];
     }
 
     /**
      * Register a bool parameter and return its value.
      *
-     * NOTE: This version is only recommended for single threaded applications since the user provided parameter
-     *       pointer won't be fully guarded from concurrent usage.
+     * NOTE: This version is only recommended for single threaded applications
+     *       since the user provided parameter pointer won't be fully guarded
+     *       from concurrent usage.
      *
      *       The point should also remain valid for the life of the handler.
      *
@@ -149,9 +160,15 @@ class ParamHandler {
      *
      * @returns the value of the parameter.
      */
-    BoolParameter& param(bool* param, const std::string& name, bool default_val, const std::string& description) {
+    BoolParameter& param(
+        bool* param,
+        const std::string& name,
+        bool default_val,
+        const std::string& description)
+    {
         std::scoped_lock lock(mutex_);
-        bool_params_[name] = BoolParameter(param, namespace_, name, default_val, description, node_);
+        bool_params_[name] = BoolParameter(param, namespace_, name, default_val, description,
+            node_);
         return bool_params_[name];
     }
 
@@ -164,17 +181,23 @@ class ParamHandler {
      *
      * @returns the value of the parameter.
      */
-    BoolArrayParameter& param(const std::string& name, const std::vector<bool>& default_val, const std::string& description) {
+    BoolArrayParameter& param(
+        const std::string& name,
+        const std::vector<bool>& default_val,
+        const std::string& description)
+    {
         std::scoped_lock lock(mutex_);
-        bool_array_params_[name] = BoolArrayParameter(nullptr, namespace_, name, default_val, description, node_);
+        bool_array_params_[name] = BoolArrayParameter(nullptr, namespace_, name, default_val,
+            description, node_);
         return bool_array_params_[name];
     }
 
     /**
      * Register a bool array parameter and return its value.
      *
-     * NOTE: This version is only recommended for single threaded applications since the user provided parameter
-     *       pointer won't be fully guarded from concurrent usage.
+     * NOTE: This version is only recommended for single threaded applications
+     *       since the user provided parameter pointer won't be fully guarded
+     *       from concurrent usage.
      *
      *       The point should also remain valid for the life of the handler.
      *
@@ -185,17 +208,24 @@ class ParamHandler {
      *
      * @returns the value of the parameter.
      */
-    BoolArrayParameter& param(std::vector<bool>* param, const std::string& name, const std::vector<bool>& default_val, const std::string& description) {
+    BoolArrayParameter& param(
+        std::vector<bool>* param,
+        const std::string& name,
+        const std::vector<bool>& default_val,
+        const std::string& description)
+    {
         std::scoped_lock lock(mutex_);
-        bool_array_params_[name] = BoolArrayParameter(param, namespace_, name, default_val, description, node_);
+        bool_array_params_[name] = BoolArrayParameter(param, namespace_, name, default_val,
+            description, node_);
         return bool_array_params_[name];
     }
 
     /**
      * Register a system integer parameter and return its value.
      *
-     * NOTE: Since ROS2 internally only uses int64_t for params, this version casts int64_t to int. It does check if the 
-     *       value is within the int range, and will fail to update the parameter internally if it's not.
+     * NOTE: Since ROS2 internally only uses int64_t for params, this version
+     *       casts int64_t to int. It does check if the value is within the int
+     *       range, and will fail to update the parameter internally if it's not.
      *
      * @param[in] name         Parameter name
      * @param[in] default_val  Default parameter value
@@ -203,20 +233,27 @@ class ParamHandler {
      *
      * @returns the value of the parameter.
      */
-    SystemIntParameter& param(const std::string& name, int default_val, const std::string& description) {
+    SystemIntParameter& param(
+        const std::string& name,
+        int default_val,
+        const std::string& description)
+    {
         std::scoped_lock lock(mutex_);
-        system_int_params_[name] = SystemIntParameter(nullptr, namespace_, name, default_val, description, node_);
+        system_int_params_[name] = SystemIntParameter(nullptr, namespace_, name, default_val,
+            description, node_);
         return system_int_params_[name];
     }
 
     /**
      * Register a system integer parameter and return its value.
-     * 
-     * NOTE: Since ROS2 internally only uses int64_t for params, this version casts int64_t to int. It does check if the 
-     *       value is within the int range, and will fail to update the parameter internally if it's not.
      *
-     * NOTE: This version is only recommended for single threaded applications since the user provided parameter
-     *       pointer won't be fully guarded from concurrent usage.
+     * NOTE: Since ROS2 internally only uses int64_t for params, this version
+     *       casts int64_t to int. It does check if the value is within the int
+     *       range, and will fail to update the parameter internally if it's not.
+     *
+     * NOTE: This version is only recommended for single threaded applications
+     *       since the user provided parameter pointer won't be fully guarded
+     *       from concurrent usage.
      *
      *       The point should also remain valid for the life of the handler.
      *
@@ -227,9 +264,15 @@ class ParamHandler {
      *
      * @returns the value of the parameter.
      */
-    SystemIntParameter& param(int* param, const std::string& name, int default_val, const std::string& description) {
+    SystemIntParameter& param(
+        int* param,
+        const std::string& name,
+        int default_val,
+        const std::string& description)
+    {
         std::scoped_lock lock(mutex_);
-        system_int_params_[name] = SystemIntParameter(param, namespace_, name, default_val, description, node_);
+        system_int_params_[name] = SystemIntParameter(param, namespace_, name, default_val,
+            description, node_);
         return system_int_params_[name];
     }
 
@@ -242,17 +285,23 @@ class ParamHandler {
      *
      * @returns the value of the parameter.
      */
-    IntParameter& param(const std::string& name, int64_t default_val, const std::string& description) {
+    IntParameter& param(
+        const std::string& name,
+        int64_t default_val,
+        const std::string& description)
+    {
         std::scoped_lock lock(mutex_);
-        int_params_[name] = IntParameter(nullptr, namespace_, name, default_val, description, node_);
+        int_params_[name] = IntParameter(nullptr, namespace_, name, default_val, description,
+            node_);
         return int_params_[name];
     }
 
     /**
      * Register an integer parameter and return its value.
-     * 
-     * NOTE: This version is only recommended for single threaded applications since the user provided parameter
-     *       pointer won't be fully guarded from concurrent usage.
+     *
+     * NOTE: This version is only recommended for single threaded applications
+     *       since the user provided parameter pointer won't be fully guarded
+     *       from concurrent usage.
      *
      *       The point should also remain valid for the life of the handler.
      *
@@ -263,7 +312,12 @@ class ParamHandler {
      *
      * @returns the value of the parameter.
      */
-    IntParameter& param(int64_t* param, const std::string& name, int64_t default_val, const std::string& description) {
+    IntParameter& param(
+        int64_t* param,
+        const std::string& name,
+        int64_t default_val,
+        const std::string& description)
+    {
         std::scoped_lock lock(mutex_);
         int_params_[name] = IntParameter(param, namespace_, name, default_val, description, node_);
         return int_params_[name];
@@ -278,17 +332,23 @@ class ParamHandler {
      *
      * @returns the value of the parameter.
      */
-    IntArrayParameter& param(const std::string& name, const std::vector<int64_t>& default_val, const std::string& description) {
+    IntArrayParameter& param(
+        const std::string& name,
+        const std::vector<int64_t>& default_val,
+        const std::string& description)
+    {
         std::scoped_lock lock(mutex_);
-        int_array_params_[name] = IntArrayParameter(nullptr, namespace_, name, default_val, description, node_);
+        int_array_params_[name] = IntArrayParameter(nullptr, namespace_, name, default_val,
+            description, node_);
         return int_array_params_[name];
     }
 
     /**
      * Register an integer array parameter and return its value.
      *
-     * NOTE: This version is only recommended for single threaded applications since the user provided parameter
-     *       pointer won't be fully guarded from concurrent usage.
+     * NOTE: This version is only recommended for single threaded applications
+     *       since the user provided parameter pointer won't be fully guarded
+     *       from concurrent usage.
      *
      *       The point should also remain valid for the life of the handler.
      *
@@ -299,9 +359,15 @@ class ParamHandler {
      *
      * @returns the value of the parameter.
      */
-    IntArrayParameter& param(std::vector<int64_t>* param, const std::string& name, const std::vector<int64_t>& default_val, const std::string& description) {
+    IntArrayParameter& param(
+        std::vector<int64_t>* param,
+        const std::string& name,
+        const std::vector<int64_t>& default_val,
+        const std::string& description)
+    {
         std::scoped_lock lock(mutex_);
-        int_array_params_[name] = IntArrayParameter(param, namespace_, name, default_val, description, node_);
+        int_array_params_[name] = IntArrayParameter(param, namespace_, name, default_val,
+            description, node_);
         return int_array_params_[name];
     }
 
@@ -314,17 +380,23 @@ class ParamHandler {
      *
      * @returns the value of the parameter.
      */
-    DoubleParameter& param(const std::string& name, double default_val, const std::string& description) {
+    DoubleParameter& param(
+        const std::string& name,
+        double default_val,
+        const std::string& description)
+    {
         std::scoped_lock lock(mutex_);
-        double_params_[name] = DoubleParameter(nullptr, namespace_, name, default_val, description, node_);
+        double_params_[name] = DoubleParameter(nullptr, namespace_, name, default_val, description,
+            node_);
         return double_params_[name];
     }
 
     /**
      * Register a double parameter and return its value.
      *
-     * NOTE: This version is only recommended for single threaded applications since the user provided parameter
-     *       pointer won't be fully guarded from concurrent usage.
+     * NOTE: This version is only recommended for single threaded applications
+     *       since the user provided parameter pointer won't be fully guarded
+     *       from concurrent usage.
      *
      *       The point should also remain valid for the life of the handler.
      *
@@ -335,9 +407,15 @@ class ParamHandler {
      *
      * @returns the value of the parameter.
      */
-    DoubleParameter& param(double* param, const std::string& name, double default_val, const std::string& description) {
+    DoubleParameter& param(
+        double* param,
+        const std::string& name,
+        double default_val,
+        const std::string& description)
+    {
         std::scoped_lock lock(mutex_);
-        double_params_[name] = DoubleParameter(param, namespace_, name, default_val, description, node_);
+        double_params_[name] = DoubleParameter(param, namespace_, name, default_val, description,
+            node_);
         return double_params_[name];
     }
 
@@ -350,17 +428,23 @@ class ParamHandler {
      *
      * @returns the value of the parameter.
      */
-    DoubleArrayParameter& param(const std::string& name, const std::vector<double>& default_val, const std::string& description) {
+    DoubleArrayParameter& param(
+        const std::string& name,
+        const std::vector<double>& default_val,
+        const std::string& description)
+    {
         std::scoped_lock lock(mutex_);
-        double_array_params_[name] = DoubleArrayParameter(nullptr, namespace_, name, default_val, description, node_);
+        double_array_params_[name] = DoubleArrayParameter(nullptr, namespace_, name, default_val,
+            description, node_);
         return double_array_params_[name];
     }
 
     /**
      * Register a double array parameter and return its value.
      *
-     * NOTE: This version is only recommended for single threaded applications since the user provided parameter
-     *       pointer won't be fully guarded from concurrent usage.
+     * NOTE: This version is only recommended for single threaded applications
+     *       since the user provided parameter pointer won't be fully guarded
+     *       from concurrent usage.
      *
      *       The point should also remain valid for the life of the handler.
      *
@@ -371,9 +455,15 @@ class ParamHandler {
      *
      * @returns the value of the parameter.
      */
-    DoubleArrayParameter& param(std::vector<double>* param, const std::string& name, const std::vector<double>& default_val, const std::string& description) {
+    DoubleArrayParameter& param(
+        std::vector<double>* param,
+        const std::string& name,
+        const std::vector<double>& default_val,
+        const std::string& description)
+    {
         std::scoped_lock lock(mutex_);
-        double_array_params_[name] = DoubleArrayParameter(param, namespace_, name, default_val, description, node_);
+        double_array_params_[name] = DoubleArrayParameter(param, namespace_, name, default_val,
+            description, node_);
         return double_array_params_[name];
     }
 
@@ -386,17 +476,23 @@ class ParamHandler {
      *
      * @returns the value of the parameter.
      */
-    StringParameter& param(const std::string& name, const std::string& default_val, const std::string& description) {
+    StringParameter& param(
+        const std::string& name,
+        const std::string& default_val,
+        const std::string& description)
+    {
         std::scoped_lock lock(mutex_);
-        string_params_[name] = StringParameter(nullptr, namespace_, name, default_val, description, node_);
+        string_params_[name] = StringParameter(nullptr, namespace_, name, default_val, description,
+            node_);
         return string_params_[name];
     }
 
     /**
      * Register a string parameter and return its value.
      *
-     * NOTE: This version is only recommended for single threaded applications since the user provided parameter
-     *       pointer won't be fully guarded from concurrent usage.
+     * NOTE: This version is only recommended for single threaded applications
+     *       since the user provided parameter pointer won't be fully guarded
+     *       from concurrent usage.
      *
      *       The point should also remain valid for the life of the handler.
      *
@@ -407,14 +503,20 @@ class ParamHandler {
      *
      * @returns the value of the parameter.
      */
-    StringParameter& param(std::string* param, const std::string& name, const std::string& default_val, const std::string& description) {
+    StringParameter& param(
+        std::string* param,
+        const std::string& name,
+        const std::string& default_val,
+        const std::string& description)
+    {
         std::scoped_lock lock(mutex_);
-        string_params_[name] = StringParameter(param, namespace_, name, default_val, description, node_);
+        string_params_[name] = StringParameter(param, namespace_, name, default_val, description,
+            node_);
         return string_params_[name];
     }
 
     /**
-     * Register a string parameter and return its value.
+     * Register a string array parameter and return its value.
      *
      * @param[in] name         Parameter name
      * @param[in] default_val  Default parameter value
@@ -422,17 +524,23 @@ class ParamHandler {
      *
      * @returns the value of the parameter.
      */
-    StringArrayParameter& param(const std::string& name, const std::vector<std::string>& default_val, const std::string& description) {
+    StringArrayParameter& param(
+        const std::string& name,
+        const std::vector<std::string>& default_val,
+        const std::string& description)
+    {
         std::scoped_lock lock(mutex_);
-        string_array_params_[name] = StringArrayParameter(nullptr, namespace_, name, default_val, description, node_);
+        string_array_params_[name] = StringArrayParameter(nullptr, namespace_, name, default_val,
+            description, node_);
         return string_array_params_[name];
     }
 
     /**
-     * Register a string parameter and return its value.
+     * Register a string array parameter and return its value.
      *
-     * NOTE: This version is only recommended for single threaded applications since the user provided parameter
-     *       pointer won't be fully guarded from concurrent usage.
+     * NOTE: This version is only recommended for single threaded applications
+     *       since the user provided parameter pointer won't be fully guarded
+     *       from concurrent usage.
      *
      *       The point should also remain valid for the life of the handler.
      *
@@ -443,9 +551,15 @@ class ParamHandler {
      *
      * @returns the value of the parameter.
      */
-    StringArrayParameter& param(std::vector<std::string>* param, const std::string& name, const std::vector<std::string>& default_val, const std::string& description) {
+    StringArrayParameter& param(
+        std::vector<std::string>* param,
+        const std::string& name,
+        const std::vector<std::string>& default_val,
+        const std::string& description)
+    {
         std::scoped_lock lock(mutex_);
-        string_array_params_[name] = StringArrayParameter(param, namespace_, name, default_val, description, node_);
+        string_array_params_[name] = StringArrayParameter(param, namespace_, name, default_val,
+            description, node_);
         return string_array_params_[name];
     }
 
@@ -472,7 +586,9 @@ private:
   std::unordered_map<std::string, StringParameter> string_params_;
   std::unordered_map<std::string, StringArrayParameter> string_array_params_;
 
-  rcl_interfaces::msg::SetParametersResult parametersCallback(const std::vector<rclcpp::Parameter> &parameters) {
+  rcl_interfaces::msg::SetParametersResult parametersCallback(
+      const std::vector<rclcpp::Parameter> &parameters)
+  {
     rcl_interfaces::msg::SetParametersResult result;
     // default to successful
     // otherwise parameters that weren't created using this handler will print a warning
@@ -480,7 +596,7 @@ private:
     result.successful = true;
     result.reason = "success";
 
-    for (const auto &param: parameters) {
+    for (const auto & param : parameters) {
         if (param.get_type() == rclcpp::ParameterType::PARAMETER_BOOL) {
             auto bool_param = bool_params_.find(param.get_name());
             if (bool_param != bool_params_.end()) {
@@ -489,8 +605,7 @@ private:
                     result.reason = "Failed to update parameter: " + bool_param->first;
                 }
             }
-        }
-        else if (param.get_type() == rclcpp::ParameterType::PARAMETER_BOOL_ARRAY) {
+        } else if (param.get_type() == rclcpp::ParameterType::PARAMETER_BOOL_ARRAY) {
             auto bool_array_param = bool_array_params_.find(param.get_name());
             if (bool_array_param != bool_array_params_.end()) {
                 if (!bool_array_param->second.update(param.as_bool_array(), true)) {
@@ -498,8 +613,7 @@ private:
                     result.reason = "Failed to update parameter: " + bool_array_param->first;
                 }
             }
-        }
-        else if (param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE) {
+        } else if (param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE) {
             auto double_param = double_params_.find(param.get_name());
             if (double_param != double_params_.end()) {
                 if (!double_param->second.update(param.as_double(), true)) {
@@ -507,8 +621,7 @@ private:
                     result.reason = "Failed to update parameter: " + double_param->first;
                 }
             }
-        }
-        else if (param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE_ARRAY) {
+        } else if (param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE_ARRAY) {
             auto double_array_param = double_array_params_.find(param.get_name());
             if (double_array_param != double_array_params_.end()) {
                 if (!double_array_param->second.update(param.as_double_array(), true)) {
@@ -516,8 +629,7 @@ private:
                     result.reason = "Failed to update parameter: " + double_array_param->first;
                 }
             }
-        }
-        else if (param.get_type() == rclcpp::ParameterType::PARAMETER_INTEGER) {
+        } else if (param.get_type() == rclcpp::ParameterType::PARAMETER_INTEGER) {
             auto int_param = int_params_.find(param.get_name());
             if (int_param != int_params_.end()) {
                 if (!int_param->second.update(param.as_int(), true)) {
@@ -525,23 +637,30 @@ private:
                     result.reason = "Failed to update parameter: " + int_param->first;
                 }
             } else {
-                // the parameter is not registered as int64_t, so we need to check if it's registered as system int
+                // the parameter is not registered as int64_t, so we need to check
+                // if it's registered as system int
                 auto int_system_param = system_int_params_.find(param.get_name());
                 if (int_system_param != system_int_params_.end()) {
-                    if (param.as_int() >= std::numeric_limits<int>::min() && param.as_int() <= std::numeric_limits<int>::max()) {
-                        if (!int_system_param->second.update(static_cast<int>(param.as_int()), true)) {
+                    if (param.as_int() >= std::numeric_limits<int>::min() &&
+                        param.as_int() <= std::numeric_limits<int>::max())
+                    {
+                        if (!int_system_param->second.update(
+                            static_cast<int>(param.as_int()), true))
+                        {
                             result.successful = false;
-                            result.reason = "Failed to update parameter: " + int_system_param->first;
+                            result.reason = "Failed to update parameter: " +
+                                int_system_param->first;
                         }
                     } else {
                         // unsafe to cast to int
                         result.successful = false;
-                        result.reason = "Failed to update parameter: " + int_system_param->first + " (value too large to cast from 'int64_t' to 'int')";
+                        result.reason = "Failed to update parameter: " +
+                            int_system_param->first +
+                            " (value too large to cast from 'int64_t' to 'int')";
                     }
                 }
             }
-        }
-        else if (param.get_type() == rclcpp::ParameterType::PARAMETER_INTEGER_ARRAY) {
+        } else if (param.get_type() == rclcpp::ParameterType::PARAMETER_INTEGER_ARRAY) {
             auto int_array_param = int_array_params_.find(param.get_name());
             if (int_array_param != int_array_params_.end()) {
                 if (!int_array_param->second.update(param.as_integer_array(), true)) {
@@ -549,8 +668,7 @@ private:
                     result.reason = "Failed to update parameter: " + int_array_param->first;
                 }
             }
-        }
-        else if (param.get_type() == rclcpp::ParameterType::PARAMETER_STRING) {
+        } else if (param.get_type() == rclcpp::ParameterType::PARAMETER_STRING) {
             auto string_param = string_params_.find(param.get_name());
             if (string_param != string_params_.end()) {
                 if (!string_param->second.update(param.as_string(), true)) {
@@ -558,8 +676,7 @@ private:
                     result.reason = "Failed to update parameter: " + string_param->first;
                 }
             }
-        }
-        else if (param.get_type() == rclcpp::ParameterType::PARAMETER_STRING_ARRAY) {
+        } else if (param.get_type() == rclcpp::ParameterType::PARAMETER_STRING_ARRAY) {
             auto string_array_param = string_array_params_.find(param.get_name());
             if (string_array_param != string_array_params_.end()) {
                 if (!string_array_param->second.update(param.as_string_array(), true)) {
@@ -582,4 +699,4 @@ private:
   }
 };
 
-}  // hatchbed_common
+}  // namespace hatchbed_common

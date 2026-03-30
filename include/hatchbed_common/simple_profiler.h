@@ -1,11 +1,45 @@
+// Copyright 2022 Hatchbed L.L.C.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are met:
+//
+//    * Redistributions of source code must retain the above copyright
+//      notice, this list of conditions and the following disclaimer.
+//
+//    * Redistributions in binary form must reproduce the above copyright
+//      notice, this list of conditions and the following disclaimer in the
+//      documentation and/or other materials provided with the distribution.
+//
+//    * Neither the name of the copyright holder nor the names of its
+//      contributors may be used to endorse or promote products derived from
+//      this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
+
 #pragma once
 
+#include <algorithm>
 #include <chrono>
+#include <cmath>
+#include <iomanip>
 #include <iostream>
+#include <map>
+#include <sstream>
 #include <stack>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #ifndef PROFILE_DISABLED
@@ -19,7 +53,7 @@ struct ProfileScopeLevel {
     std::string path;
     std::vector<std::string> children;
 
-    ProfileScopeLevel(const std::string& path_)
+    explicit ProfileScopeLevel(const std::string& path_)
         : path(path_) {}
 };
 
@@ -99,16 +133,17 @@ public:
 
     /**
      * Print detailed timing data in a formatted tree structure.
-     * 
+     *
      * @param[in] os  The output stream to write to.
      */
-    void print(std::ostream& os) const {    
+    void print(std::ostream& os) const {
         if (!enabled) {
             return;
         }
 
         // Helper to get indentation & scope label
-        auto get_indent_and_label = [](const std::string& full_name) -> std::pair<int, std::string> {
+        auto get_indent_and_label = [](const std::string& full_name)
+            -> std::pair<int, std::string> {
             size_t last = full_name.find_last_of('/');
             if (last == std::string::npos || last == 0)
                 return {0, full_name.substr(last + 1)};
@@ -156,7 +191,6 @@ public:
         }
         max_avg_digits += 3;
         const int avg_width = std::max(max_avg_digits + 2, 4);
-
 
         // Header
         os << "\n";
@@ -208,7 +242,7 @@ public:
 
     /**
      * Enable or disable profiling globally.
-     * 
+     *
      * @param[in] is_enabled  True to enable profiling, false to disable.
      */
     void setEnabled(bool is_enabled) {
@@ -217,13 +251,13 @@ public:
 
     /**
      * A RAII timer that starts on construction and stops on destruction.
-     *        
+     *
      * Intended for automatic profiling of scoped code blocks.
      */
     class ScopedTimer {
     public:
-        ScopedTimer(const std::string& name)
-            : name_(name), scope_depth_(SimpleProfiler::instance().currentScopeDepth()) 
+        explicit ScopedTimer(const std::string& name)
+            : name_(name), scope_depth_(SimpleProfiler::instance().currentScopeDepth())
         {
             SimpleProfiler::instance().start(name_);
         }
@@ -248,13 +282,13 @@ private:
     /**
      * Get the current scope depth.
      */
-    size_t currentScopeDepth() const { 
-        return scope_stack.size(); 
+    size_t currentScopeDepth() const {
+        return scope_stack.size();
     }
 
     /**
      * Start timing a named profiling scope.
-     * 
+     *
      * @param[in] name  The name of the scope to start.
      */
     void start(const std::string& name) {
@@ -274,7 +308,7 @@ private:
         }
 
         current_level.children.push_back(name);
-        
+
         std::string full_name = current_level.path + "/" + name;
         start_times[full_name] = std::chrono::high_resolution_clock::now();
 
@@ -286,7 +320,7 @@ private:
 
     /**
      * Stop timing a named profiling scope.
-     * 
+     *
      * @param[in] name  The name of the scope to stop.
      */
     void stop(const std::string& name) {
@@ -310,7 +344,7 @@ private:
 
     /**
      * Internal helper to stop and record timing for a given scope.
-     * 
+     *
      * @param[in] name  The full name (path) of the scope.
      */
     void stopScope(const std::string& name) {
@@ -374,7 +408,8 @@ inline void set_enabled(bool enabled) {
 /**
  * Helper macro for creating a ScopedTimer with a unique name.
  */
-#define profile_scope(name) profile::SimpleProfiler::ScopedTimer PROFILE_CONCAT(timer, __COUNTER__)(name)
+#define profile_scope(name) \
+    profile::SimpleProfiler::ScopedTimer PROFILE_CONCAT(timer, __COUNTER__)(name)
 
 #else
 
@@ -394,6 +429,6 @@ inline void set_enabled(bool enabled) {}
 
 }  // namespace profile
 
-#define profile_scope(name) do {} while(0)
+#define profile_scope(name) do {} while (0)
 
 #endif
