@@ -269,5 +269,13 @@ bool transformAndDeskewPointCloud(
     const Eigen::Isometry3d& T_out_sensor,
     sensor_msgs::msg::PointCloud2& out);
 
+// Apply a static rigid transform T to every finite point in msg, writing the
+// result to out. All fields other than x, y, z are copied verbatim.
+// Returns false if x, y, z float32 fields are missing; true on success.
+bool transformPointCloud(
+    const sensor_msgs::msg::PointCloud2& msg,
+    const Eigen::Isometry3d& T,
+    sensor_msgs::msg::PointCloud2& out);
+
 }  // namespace pointcloud
 }  // namespace hatchbed_common

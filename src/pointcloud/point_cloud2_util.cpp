@@ -133,5 +133,36 @@ bool transformAndDeskewPointCloud(
     return true;
 }
 
+bool transformPointCloud(
+    const sensor_msgs::msg::PointCloud2& msg,
+    const Eigen::Isometry3d& T,
+    sensor_msgs::msg::PointCloud2& out)
+{
+    if (!hasField<float>(msg, "x") || !hasField<float>(msg, "y") ||
+        !hasField<float>(msg, "z")) {
+        return false;
+    }
+
+    out = msg;
+
+    auto out_x = getFieldIterator<float>(out, "x");
+    auto out_y = getFieldIterator<float>(out, "y");
+    auto out_z = getFieldIterator<float>(out, "z");
+
+    const Eigen::Matrix4d M = T.matrix();
+    const size_t num_points = static_cast<size_t>(out.width) * out.height;
+    for (size_t i = 0; i < num_points; ++i, ++out_x, ++out_y, ++out_z) {
+        if (!std::isfinite(*out_x) || !std::isfinite(*out_y) || !std::isfinite(*out_z)) {
+            continue;
+        }
+        const Eigen::Vector4d p = M * Eigen::Vector4d(*out_x, *out_y, *out_z, 1.0);
+        *out_x = static_cast<float>(p.x());
+        *out_y = static_cast<float>(p.y());
+        *out_z = static_cast<float>(p.z());
+    }
+
+    return true;
+}
+
 }  // namespace pointcloud
 }  // namespace hatchbed_common

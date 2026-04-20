@@ -38,6 +38,7 @@
 using hatchbed_common::pointcloud::hasField;
 using hatchbed_common::pointcloud::getFieldIterator;
 using hatchbed_common::pointcloud::transformAndDeskewPointCloud;
+using hatchbed_common::pointcloud::transformPointCloud;
 
 // Build a PointCloud2 with float32 x, y, z and uint32 t fields.
 // Points are given as (x, y, z, t_ns).
@@ -308,6 +309,78 @@ TEST(TransformAndDeskew, OutputHasSameFieldsAndPointStep) {
     transformAndDeskewPointCloud(
         cloud, Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero(),
         Eigen::Isometry3d::Identity(), out);
+
+    EXPECT_EQ(out.point_step, cloud.point_step);
+    EXPECT_EQ(out.fields.size(), cloud.fields.size());
+    for (size_t i = 0; i < cloud.fields.size(); ++i) {
+        EXPECT_EQ(out.fields[i].name,     cloud.fields[i].name);
+        EXPECT_EQ(out.fields[i].offset,   cloud.fields[i].offset);
+        EXPECT_EQ(out.fields[i].datatype, cloud.fields[i].datatype);
+    }
+}
+
+// =============================================================================
+// transformPointCloud
+// =============================================================================
+
+TEST(TransformPointCloud, ReturnsFalseIfXyzMissing) {
+    sensor_msgs::msg::PointCloud2 cloud;
+    cloud.width = 1; cloud.height = 1;
+    cloud.point_step = 4; cloud.row_step = 4;
+    cloud.data.resize(4, 0);
+
+    sensor_msgs::msg::PointCloud2 out;
+    EXPECT_FALSE(transformPointCloud(cloud, Eigen::Isometry3d::Identity(), out));
+}
+
+TEST(TransformPointCloud, IdentityPreservesPoints) {
+    auto cloud = makeCloud({{1.f, 2.f, 3.f, 0u}, {-1.f, 0.f, 4.f, 0u}});
+    sensor_msgs::msg::PointCloud2 out;
+    EXPECT_TRUE(transformPointCloud(cloud, Eigen::Isometry3d::Identity(), out));
+
+    auto [x0, y0, z0] = getPoint(out, 0);
+    EXPECT_NEAR(x0, 1.f, 1e-5f);
+    EXPECT_NEAR(y0, 2.f, 1e-5f);
+    EXPECT_NEAR(z0, 3.f, 1e-5f);
+
+    auto [x1, y1, z1] = getPoint(out, 1);
+    EXPECT_NEAR(x1, -1.f, 1e-5f);
+    EXPECT_NEAR(y1,  0.f, 1e-5f);
+    EXPECT_NEAR(z1,  4.f, 1e-5f);
+}
+
+TEST(TransformPointCloud, TranslationApplied) {
+    Eigen::Isometry3d T = Eigen::Isometry3d::Identity();
+    T.translation() = Eigen::Vector3d(5.0, 0.0, 0.0);
+
+    auto cloud = makeCloud({{1.f, 2.f, 3.f, 0u}});
+    sensor_msgs::msg::PointCloud2 out;
+    transformPointCloud(cloud, T, out);
+
+    auto [x, y, z] = getPoint(out, 0);
+    EXPECT_NEAR(x, 6.f, 1e-5f);
+    EXPECT_NEAR(y, 2.f, 1e-5f);
+    EXPECT_NEAR(z, 3.f, 1e-5f);
+}
+
+TEST(TransformPointCloud, NanPointsPreservedAsNan) {
+    const float nan = std::numeric_limits<float>::quiet_NaN();
+    auto cloud = makeCloud({{nan, nan, nan, 0u}, {1.f, 2.f, 3.f, 0u}});
+
+    sensor_msgs::msg::PointCloud2 out;
+    transformPointCloud(cloud, Eigen::Isometry3d::Identity(), out);
+
+    auto [x0, y0, z0] = getPoint(out, 0);
+    EXPECT_TRUE(std::isnan(x0));
+
+    auto [x1, y1, z1] = getPoint(out, 1);
+    EXPECT_NEAR(x1, 1.f, 1e-5f);
+}
+
+TEST(TransformPointCloud, OutputHasSameFieldsAndPointStep) {
+    auto cloud = makeCloud({{1.f, 2.f, 3.f, 100u}});
+    sensor_msgs::msg::PointCloud2 out;
+    transformPointCloud(cloud, Eigen::Isometry3d::Identity(), out);
 
     EXPECT_EQ(out.point_step, cloud.point_step);
     EXPECT_EQ(out.fields.size(), cloud.fields.size());
