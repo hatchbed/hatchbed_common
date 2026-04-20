@@ -29,6 +29,7 @@
 #pragma once
 
 #include <Eigen/Core>
+#include <Eigen/Geometry>
 #include <algorithm>
 #include <cstdint>
 #include <memory>
@@ -71,28 +72,46 @@ template <> struct point_field_type<double> {
 };
 
 // Iterator wrapper returned by getFieldIterator(). Evaluates to false if the
-// requested field was absent or had the wrong type; otherwise behaves like a
-// PointCloud2ConstIterator<T> with single dereference.
-template <typename T>
-class FieldIterator
+// requested field was absent or had the wrong type; otherwise dereferences to
+// the field value. Iter may be PointCloud2ConstIterator<T> (read-only) or
+// PointCloud2Iterator<T> (read-write).
+template <typename Iter>
+class FieldIteratorBase
 {
 public:
-  FieldIterator() = default;
+  FieldIteratorBase() = default;
 
-  explicit FieldIterator(sensor_msgs::PointCloud2ConstIterator<T> iter)
-  : iter_(std::move(iter)) {}
+  explicit FieldIteratorBase(Iter iter) : iter_(std::move(iter)) {}
 
   explicit operator bool() const { return iter_.has_value(); }
 
-  const T & operator*() const { return **iter_; }
-  FieldIterator & operator++() { ++(*iter_); return *this; }
+  auto & operator*() { return **iter_; }
+  const auto & operator*() const { return **iter_; }
+  FieldIteratorBase & operator++() { ++(*iter_); return *this; }
 
 private:
-  std::optional<sensor_msgs::PointCloud2ConstIterator<T>> iter_;
+  std::optional<Iter> iter_;
 };
 
-// Returns a FieldIterator<T> for the named field if it exists and its datatype
-// matches T, or an invalid FieldIterator (evaluates to false) otherwise.
+template <typename T>
+using FieldIterator = FieldIteratorBase<sensor_msgs::PointCloud2ConstIterator<T>>;
+
+template <typename T>
+using MutableFieldIterator = FieldIteratorBase<sensor_msgs::PointCloud2Iterator<T>>;
+
+// Returns true if cloud contains a field with the given name whose datatype
+// matches T.
+template <typename T>
+bool hasField(const sensor_msgs::msg::PointCloud2 & cloud, const std::string & field_name)
+{
+  auto it = std::find_if(
+    cloud.fields.begin(), cloud.fields.end(),
+    [&field_name](const sensor_msgs::msg::PointField & f) { return f.name == field_name; });
+  return it != cloud.fields.end() && it->datatype == point_field_type<T>::value;
+}
+
+// Returns a FieldIterator<T> (read-only) for the named field if it exists and
+// its datatype matches T, or an invalid iterator (evaluates to false) otherwise.
 template <typename T>
 FieldIterator<T> getFieldIterator(
   const sensor_msgs::msg::PointCloud2 & cloud, const std::string & field_name)
@@ -106,6 +125,23 @@ FieldIterator<T> getFieldIterator(
   }
 
   return FieldIterator<T>{sensor_msgs::PointCloud2ConstIterator<T>(cloud, field_name)};
+}
+
+// Returns a MutableFieldIterator<T> (read-write) for the named field if it
+// exists and its datatype matches T, or an invalid iterator otherwise.
+template <typename T>
+MutableFieldIterator<T> getFieldIterator(
+  sensor_msgs::msg::PointCloud2 & cloud, const std::string & field_name)
+{
+  auto it = std::find_if(
+    cloud.fields.begin(), cloud.fields.end(),
+    [&field_name](const sensor_msgs::msg::PointField & f) { return f.name == field_name; });
+
+  if (it == cloud.fields.end() || it->datatype != point_field_type<T>::value) {
+    return MutableFieldIterator<T>{};
+  }
+
+  return MutableFieldIterator<T>{sensor_msgs::PointCloud2Iterator<T>(cloud, field_name)};
 }
 
 class ConstPointIterator {
@@ -202,6 +238,36 @@ sensor_msgs::msg::PointCloud2::SharedPtr createPointCloud2(const T & points)
 
   return msg;
 }
+
+// Transform a PointCloud2 from sensor to output frame and deskew it using a
+// constant body-frame twist.
+//
+// T_out_sensor is the static transform from the sensor frame to the output
+// frame (T_out_sensor * p_sensor = p_output).
+//
+// linear_vel and angular_vel are the body-frame velocity of the output frame,
+// expressed in the output frame, assumed constant over the scan duration.
+//
+// The per-point "t" field (uint32, nanosecond offset from scan start) is used
+// to compute the motion correction applied to each point:
+//   dt_i = t_field_ns * 1e-9
+//   T_deskew(dt_i) = rigid body motion from linear_vel and angular_vel over dt_i
+//   p_out = T_deskew(dt_i) * T_out_sensor * p_sensor
+//
+// The output PointCloud2 has the same fields and point_step as the input.
+// NaN/Inf points are dropped; the remaining valid points appear in the same
+// relative order as in the input. The xyz fields are overwritten with the
+// transformed and deskewed coordinates; all other fields are copied verbatim
+// via memcpy.
+//
+// Returns false if any required field (x, y, z float32 or t uint32) is missing,
+// true on success.
+bool transformAndDeskewPointCloud(
+    const sensor_msgs::msg::PointCloud2& msg,
+    const Eigen::Vector3d& linear_vel,
+    const Eigen::Vector3d& angular_vel,
+    const Eigen::Isometry3d& T_out_sensor,
+    sensor_msgs::msg::PointCloud2& out);
 
 }  // namespace pointcloud
 }  // namespace hatchbed_common

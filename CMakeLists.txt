@@ -158,6 +158,9 @@ if(BUILD_TESTING)
 
   ament_add_gtest(test_pose_buffer test/localization/test_pose_buffer.cpp)
   target_link_libraries(test_pose_buffer hatchbed_common_localization)
+
+  ament_add_gtest(test_point_cloud2_util test/pointcloud/test_point_cloud2_util.cpp)
+  target_link_libraries(test_point_cloud2_util hatchbed_common_pointcloud)
 endif()
 
 ament_package()

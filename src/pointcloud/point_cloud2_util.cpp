@@ -28,12 +28,13 @@
 
 #include <hatchbed_common/pointcloud/point_cloud2_util.hpp>
 
-#include <algorithm>
+#include <cmath>
 #include <cstdint>
-#include <cstring>
 #include <iostream>
+#include <limits>
 #include <string>
-#include <vector>
+
+#include <Eigen/Core>
 
 namespace hatchbed_common {
 namespace pointcloud {
@@ -74,6 +75,62 @@ ConstPointIterator & ConstPointIterator::operator++()
 bool ConstPointIterator::operator!=(const ConstPointIterator & other) const
 {
     return index_ != other.index_;
+}
+
+bool transformAndDeskewPointCloud(
+    const sensor_msgs::msg::PointCloud2& msg,
+    const Eigen::Vector3d& linear_vel,
+    const Eigen::Vector3d& angular_vel,
+    const Eigen::Isometry3d& T_out_sensor,
+    sensor_msgs::msg::PointCloud2& out)
+{
+    if (!hasField<float>(msg, "x") || !hasField<float>(msg, "y") ||
+        !hasField<float>(msg, "z") || !hasField<uint32_t>(msg, "t")) {
+        return false;
+    }
+
+    out = msg;
+
+    auto out_x = getFieldIterator<float>(out, "x");
+    auto out_y = getFieldIterator<float>(out, "y");
+    auto out_z = getFieldIterator<float>(out, "z");
+    auto out_t = getFieldIterator<uint32_t>(out, "t");
+
+    const double omega_norm = angular_vel.norm();
+    const bool has_rotation = omega_norm > 1e-10;
+    const Eigen::Vector3d omega_axis =
+        has_rotation ? Eigen::Vector3d(angular_vel / omega_norm) : Eigen::Vector3d::UnitZ();
+
+    uint32_t last_t = std::numeric_limits<uint32_t>::max();
+    Eigen::Matrix4d M_combined = T_out_sensor.matrix();
+
+    const size_t num_points = static_cast<size_t>(out.width) * out.height;
+    for (size_t i = 0; i < num_points; ++i, ++out_x, ++out_y, ++out_z, ++out_t) {
+        if (!std::isfinite(*out_x) || !std::isfinite(*out_y) || !std::isfinite(*out_z)) {
+            continue;
+        }
+
+        if (*out_t != last_t) {
+            last_t = *out_t;
+            const double dt = static_cast<double>(last_t) * 1e-9;
+
+            Eigen::Isometry3d T_deskew = Eigen::Isometry3d::Identity();
+            if (has_rotation) {
+                T_deskew.linear() =
+                    Eigen::AngleAxisd(omega_norm * dt, omega_axis).toRotationMatrix();
+            }
+            T_deskew.translation() = linear_vel * dt;
+            M_combined = T_deskew.matrix() * T_out_sensor.matrix();
+        }
+
+        const Eigen::Vector4d p =
+            M_combined * Eigen::Vector4d(*out_x, *out_y, *out_z, 1.0);
+        *out_x = static_cast<float>(p.x());
+        *out_y = static_cast<float>(p.y());
+        *out_z = static_cast<float>(p.z());
+    }
+
+    return true;
 }
 
 }  // namespace pointcloud
