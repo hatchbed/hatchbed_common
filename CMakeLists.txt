@@ -3,11 +3,13 @@ project(hatchbed_common)
 
 find_package(ament_cmake REQUIRED)
 find_package(Eigen3 REQUIRED)
+find_package(fmt REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
@@ -21,8 +23,32 @@ set_target_properties(hatchbed_common PROPERTIES EXPORT_NAME common)
 target_include_directories(hatchbed_common INTERFACE
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
-target_link_libraries(hatchbed_common INTERFACE rclcpp::rclcpp)
+target_link_libraries(hatchbed_common INTERFACE
+  rclcpp::rclcpp)
+target_compile_features(hatchbed_common INTERFACE cxx_std_17)
 add_library(hatchbed_common::common ALIAS hatchbed_common)
+
+# -----------------------------------------------------------------------------
+# Logging header-only library
+# -----------------------------------------------------------------------------
+add_library(hatchbed_common_logging INTERFACE)
+set_target_properties(hatchbed_common_logging PROPERTIES EXPORT_NAME logging)
+target_include_directories(hatchbed_common_logging INTERFACE
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+target_link_libraries(hatchbed_common_logging INTERFACE
+  Eigen3::Eigen
+  fmt::fmt
+  rclcpp::rclcpp
+  stdc++fs
+  tf2::tf2
+  ${std_msgs_TARGETS}
+  ${geometry_msgs_TARGETS}
+  ${nav_msgs_TARGETS}
+  ${sensor_msgs_TARGETS}
+  ${tf2_msgs_TARGETS}
+  ${visualization_msgs_TARGETS})
+add_library(hatchbed_common::logging ALIAS hatchbed_common_logging)
 
 # -----------------------------------------------------------------------------
 # Localization library
@@ -37,7 +63,6 @@ add_library(hatchbed_common_localization SHARED
   src/localization/covariance_util.cpp
   src/localization/pose_buffer.cpp
 )
-set_property(TARGET hatchbed_common_localization PROPERTY CXX_STANDARD 17)
 set_target_properties(hatchbed_common_localization PROPERTIES EXPORT_NAME localization)
 target_link_libraries(hatchbed_common_localization PUBLIC
   hatchbed_common
@@ -77,7 +102,6 @@ rclcpp_components_register_node(hatchbed_common_localization
 add_library(hatchbed_common_pointcloud SHARED
   src/pointcloud/components/crop_box.cpp
   src/pointcloud/point_cloud2_util.cpp)
-set_property(TARGET hatchbed_common_pointcloud PROPERTY CXX_STANDARD 17)
 set_target_properties(hatchbed_common_pointcloud PROPERTIES EXPORT_NAME pointcloud)
 target_link_libraries(hatchbed_common_pointcloud PUBLIC
   hatchbed_common
@@ -95,7 +119,6 @@ rclcpp_components_register_node(hatchbed_common_pointcloud
 # Example
 # -----------------------------------------------------------------------------
 add_executable(example_node example/example_node.cpp)
-set_property(TARGET example_node PROPERTY CXX_STANDARD 17)
 target_link_libraries(example_node PRIVATE hatchbed_common)
 
 # -----------------------------------------------------------------------------
@@ -103,6 +126,7 @@ target_link_libraries(example_node PRIVATE hatchbed_common)
 # -----------------------------------------------------------------------------
 install(TARGETS
   hatchbed_common
+  hatchbed_common_logging
   hatchbed_common_localization
   hatchbed_common_pointcloud
   EXPORT hatchbed_commonTargets
@@ -129,11 +153,13 @@ install(DIRECTORY include/
 ament_export_targets(hatchbed_commonTargets HAS_LIBRARY_TARGET)
 ament_export_dependencies(
   Eigen3
+  fmt
   geometry_msgs
   nav_msgs
   rclcpp
   rclcpp_components
   sensor_msgs
+  std_msgs
   tf2
   tf2_msgs
   tf2_ros
@@ -161,6 +187,15 @@ if(BUILD_TESTING)
 
   ament_add_gtest(test_point_cloud2_util test/pointcloud/test_point_cloud2_util.cpp)
   target_link_libraries(test_point_cloud2_util hatchbed_common_pointcloud)
+
+  ament_add_gtest(test_logging test/logging/test_logging.cpp)
+  target_link_libraries(test_logging hatchbed_common_logging)
+
+  ament_add_gtest(test_formatting test/logging/test_formatting.cpp)
+  target_link_libraries(test_formatting hatchbed_common_logging)
+
+  ament_add_gtest(test_message_formatting test/logging/test_message_formatting.cpp)
+  target_link_libraries(test_message_formatting hatchbed_common_logging)
 endif()
 
 ament_package()
