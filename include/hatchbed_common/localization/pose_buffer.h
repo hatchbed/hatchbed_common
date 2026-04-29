@@ -66,6 +66,10 @@ public:
     // Remove all entries with a stamp strictly older than the given stamp.
     void expireBefore(const rclcpp::Time& stamp);
 
+    // Return the stamp of the oldest/newest entry, or nullopt if empty.
+    std::optional<rclcpp::Time> earliestStamp() const;
+    std::optional<rclcpp::Time> latestStamp()   const;
+
     void   clear();
     bool   empty() const;
     size_t size()  const;

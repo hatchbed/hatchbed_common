@@ -36,7 +36,10 @@ namespace localization {
 PoseBuffer::PoseBuffer(double max_age) : max_age_(max_age) {}
 
 void PoseBuffer::push(const rclcpp::Time& stamp, const Eigen::Isometry3d& pose) {
-    buffer_.push_back({stamp, pose});
+    Eigen::Isometry3d normalized = pose;
+    normalized.linear() = Eigen::Quaterniond(pose.linear()).normalized().toRotationMatrix();
+
+    buffer_.push_back({stamp, normalized});
     while (buffer_.size() > 1 &&
            (stamp - buffer_.front().first).seconds() > max_age_) {
         buffer_.pop_front();
@@ -79,10 +82,15 @@ std::optional<Eigen::Isometry3d> PoseBuffer::lookup(const rclcpp::Time& stamp) c
     result.translation() =
         (1.0 - alpha) * prev.second.translation() +
         alpha * next.second.translation();
-    result.linear() =
-        Eigen::Quaterniond(prev.second.linear())
-            .slerp(alpha, Eigen::Quaterniond(next.second.linear()))
-            .toRotationMatrix();
+
+    // normalize quaternions
+    Eigen::Quaterniond q_prev(prev.second.linear());
+    q_prev.normalize();
+
+    Eigen::Quaterniond q_next(next.second.linear());
+    q_next.normalize();
+
+    result.linear() = q_prev.slerp(alpha, q_next).toRotationMatrix();
     return result;
 }
 
@@ -95,7 +103,20 @@ void PoseBuffer::expireBefore(const rclcpp::Time& stamp) {
 void PoseBuffer::applyTransform(const Eigen::Isometry3d& T) {
     for (auto& [stamp, pose] : buffer_) {
         pose = T * pose;
+
+        // re-normalize orientation
+        pose.linear() = Eigen::Quaterniond(pose.linear()).normalized().toRotationMatrix();
     }
+}
+
+std::optional<rclcpp::Time> PoseBuffer::earliestStamp() const {
+    if (buffer_.empty()) return std::nullopt;
+    return buffer_.front().first;
+}
+
+std::optional<rclcpp::Time> PoseBuffer::latestStamp() const {
+    if (buffer_.empty()) return std::nullopt;
+    return buffer_.back().first;
 }
 
 void   PoseBuffer::clear() { buffer_.clear(); }

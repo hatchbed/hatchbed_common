@@ -182,8 +182,8 @@ TEST(PoseBuffer, LookupAtBracketEndpointsMatchesPushedPoses) {
     ASSERT_TRUE(r0.has_value());
     EXPECT_TRUE(r0->translation().isApprox(p0.translation(), 1e-9));
 
-    // Exact match at newest is not supported (lookup returns nullopt after newest),
-    // but a value just inside the range should be very close to p1.
+    // Exact match at the newest entry goes through the interpolation path with alpha=1.0
+    // and returns the correct pose. Use near-end to test that the interpolation is tight.
     auto r1 = buf.lookup(ts(1.0 - 1e-9));
     ASSERT_TRUE(r1.has_value());
     EXPECT_NEAR(r1->translation().x(), 3.0, 1e-6);
@@ -326,6 +326,60 @@ TEST(PoseBuffer, ExpireBeforeWithStampBeforeAllEntriesRemovesNothing) {
 
     buf.expireBefore(ts(0.5));
     EXPECT_EQ(buf.size(), 2u);
+}
+
+// -----------------------------------------------------------------------------
+// earliestStamp() / latestStamp()
+// -----------------------------------------------------------------------------
+
+TEST(PoseBuffer, StampRangeOnEmptyBufferReturnsNullopt) {
+    PoseBuffer buf;
+    EXPECT_FALSE(buf.earliestStamp().has_value());
+    EXPECT_FALSE(buf.latestStamp().has_value());
+}
+
+TEST(PoseBuffer, StampRangeWithSingleEntryReturnsThatStamp) {
+    PoseBuffer buf;
+    buf.push(ts(1.5), Eigen::Isometry3d::Identity());
+    ASSERT_TRUE(buf.earliestStamp().has_value());
+    ASSERT_TRUE(buf.latestStamp().has_value());
+    EXPECT_EQ(buf.earliestStamp()->nanoseconds(), ts(1.5).nanoseconds());
+    EXPECT_EQ(buf.latestStamp()->nanoseconds(), ts(1.5).nanoseconds());
+}
+
+TEST(PoseBuffer, StampRangeReturnsOldestAndNewest) {
+    PoseBuffer buf(10.0);
+    buf.push(ts(1.0), Eigen::Isometry3d::Identity());
+    buf.push(ts(2.0), Eigen::Isometry3d::Identity());
+    buf.push(ts(3.0), Eigen::Isometry3d::Identity());
+
+    ASSERT_TRUE(buf.earliestStamp().has_value());
+    ASSERT_TRUE(buf.latestStamp().has_value());
+    EXPECT_EQ(buf.earliestStamp()->nanoseconds(), ts(1.0).nanoseconds());
+    EXPECT_EQ(buf.latestStamp()->nanoseconds(), ts(3.0).nanoseconds());
+}
+
+TEST(PoseBuffer, StampRangeUpdatesAfterPruning) {
+    // With max_age=0.5, pushing t=1.0 should evict t=0.0 (1.0s old) but
+    // retain t=0.7 (only 0.3s old).
+    PoseBuffer buf(0.5);
+    buf.push(ts(0.0), Eigen::Isometry3d::Identity());
+    buf.push(ts(0.7), Eigen::Isometry3d::Identity());
+    buf.push(ts(1.0), Eigen::Isometry3d::Identity());
+
+    ASSERT_TRUE(buf.earliestStamp().has_value());
+    ASSERT_TRUE(buf.latestStamp().has_value());
+    EXPECT_EQ(buf.earliestStamp()->nanoseconds(), ts(0.7).nanoseconds());
+    EXPECT_EQ(buf.latestStamp()->nanoseconds(), ts(1.0).nanoseconds());
+}
+
+TEST(PoseBuffer, StampRangeReturnsNulloptAfterClear) {
+    PoseBuffer buf;
+    buf.push(ts(0.0), Eigen::Isometry3d::Identity());
+    buf.push(ts(1.0), Eigen::Isometry3d::Identity());
+    buf.clear();
+    EXPECT_FALSE(buf.earliestStamp().has_value());
+    EXPECT_FALSE(buf.latestStamp().has_value());
 }
 
 int main(int argc, char** argv) {
