@@ -34,7 +34,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <rcutils/logging.h>
 
-using hatchbed_common::logging::format_or_forward;
+using hatchbed_common::logging::FormatOrForward;
 using hatchbed_common::logging::resolve_duration;
 using hatchbed_common::logging::resolve_logger;
 using hatchbed_common::logging::set_default_logger;
@@ -110,6 +110,8 @@ TEST_F(LoggingTest, ResolveDuration) {
 }
 
 TEST_F(LoggingTest, FormatOrForward) {
+    FormatOrForward format_or_forward{__FILE__, __LINE__};
+
     // Single Argument: String Literal
     EXPECT_STREQ(format_or_forward("hello"), "hello");
 
@@ -322,15 +324,96 @@ TEST_F(LoggingTest, ResolveDurationChronoMicroseconds) {
 // ============================================================================
 
 TEST_F(LoggingTest, FormatOrForwardEmptyString) {
+    FormatOrForward format_or_forward{__FILE__, __LINE__};
     EXPECT_STREQ(format_or_forward(""), "");
 }
 
 TEST_F(LoggingTest, FormatOrForwardDouble) {
+    FormatOrForward format_or_forward{__FILE__, __LINE__};
     EXPECT_EQ(format_or_forward(3.14), "3.14");
 }
 
 TEST_F(LoggingTest, FormatOrForwardThreeArgs) {
+    FormatOrForward format_or_forward{__FILE__, __LINE__};
     EXPECT_EQ(format_or_forward("{} + {} = {}", 1, 2, 3), "1 + 2 = 3");
+}
+
+TEST_F(LoggingTest, FormatOrForwardErrorHandling) {
+    // To test runtime error handling, we MUST use fmt::runtime().
+    // If we pass a bad string literal directly, fmt::format_string will correctly
+    // trigger a compile-time error, preventing the test from even building!
+
+    // Here, we provide two `{}` brackets but only one argument (42).
+    std::string bad_format_str = "Value 1: {}, Value 2: {}";
+
+    // Manually pass in a fake file and line number for predictable testing
+    FormatOrForward format_or_forward{"src/fake_node.cpp", 101};
+
+    // Execute the formatter. It should catch the format_error internally.
+    std::string result = format_or_forward(fmt::runtime(bad_format_str), 42);
+
+    EXPECT_TRUE(result.find("src/fake_node.cpp:101") != std::string::npos);
+}
+
+// ============================================================================
+// 10. MACRO RUNTIME ERROR HANDLING
+// ============================================================================
+
+TEST_F(LoggingTest, MacroRuntimeFormatError) {
+    // Verifies that a standard log macro catches format errors and logs them
+    std::string bad_format = "Missing arg: {} and {}";
+    HB_INFO(nullptr, fmt::runtime(bad_format), "only_one");
+
+    ASSERT_EQ(g_log_records.size(), 1u);
+    // Verify the error message contains our custom error prefix
+    EXPECT_TRUE(g_log_records[0].message.find("[LOGGING ERROR:") != std::string::npos);
+    // Verify it correctly captured the file name from the macro expansion
+    EXPECT_TRUE(g_log_records[0].message.find("test_logging.cpp") != std::string::npos);
+}
+
+TEST_F(LoggingTest, MacroRuntimeFormatErrorOnce) {
+    // Verifies that even in stateful macros, the error is caught and state is respected
+    std::string bad_format = "Once error: {}";
+    for (int i = 0; i < 3; ++i) {
+        HB_ERROR_ONCE(nullptr, fmt::runtime(bad_format));
+    }
+
+    // Should only log the error once despite being called in a loop
+    ASSERT_EQ(g_log_records.size(), 1u);
+    EXPECT_TRUE(g_log_records[0].message.find("[LOGGING ERROR:") != std::string::npos);
+    EXPECT_EQ(g_log_records[0].severity, RCUTILS_LOG_SEVERITY_ERROR);
+}
+
+TEST_F(LoggingTest, MacroRuntimeFormatErrorThrottle) {
+    // Verifies that throttled logs catch errors and respect the timer
+    auto clock = std::make_shared<rclcpp::Clock>(RCL_STEADY_TIME);
+    std::string bad_format = "Throttle error: {}";
+
+    for (int i = 0; i < 3; ++i) {
+        HB_WARN_THROTTLE(nullptr, clock, 1000, fmt::runtime(bad_format));
+    }
+
+    // Should only log the error once because of the 1000ms throttle
+    ASSERT_EQ(g_log_records.size(), 1u);
+    EXPECT_TRUE(g_log_records[0].message.find("[LOGGING ERROR:") != std::string::npos);
+    EXPECT_EQ(g_log_records[0].severity, RCUTILS_LOG_SEVERITY_WARN);
+}
+
+TEST_F(LoggingTest, MacroRuntimeFormatErrorExpression) {
+    // Verifies that error handling works inside conditional expression macros
+    std::string bad_format = "Expression error: {}";
+    bool should_log = true;
+
+    HB_INFO_EXPRESSION(nullptr, should_log, fmt::runtime(bad_format));
+
+    ASSERT_EQ(g_log_records.size(), 1u);
+    EXPECT_TRUE(g_log_records[0].message.find("[LOGGING ERROR:") != std::string::npos);
+
+    std::string bad_format2 = "Expression error: {} {}";
+    HB_INFO_EXPRESSION(nullptr, should_log, fmt::runtime(bad_format2));
+
+    ASSERT_EQ(g_log_records.size(), 2u);
+    EXPECT_TRUE(g_log_records[1].message.find("[LOGGING ERROR:") != std::string::npos);
 }
 
 int main(int argc, char ** argv) {

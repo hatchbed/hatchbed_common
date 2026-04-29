@@ -24,6 +24,7 @@ target_include_directories(hatchbed_common INTERFACE
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 target_link_libraries(hatchbed_common INTERFACE
+  fmt::fmt
   rclcpp::rclcpp)
 target_compile_features(hatchbed_common INTERFACE cxx_std_17)
 add_library(hatchbed_common::common ALIAS hatchbed_common)

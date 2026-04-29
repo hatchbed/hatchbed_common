@@ -42,7 +42,7 @@
       condition_before \
       rcutils_log(&__hb_log_loc, severity, __hb_log_name, "%s", \
                   rclcpp::get_c_string( \
-                    hatchbed_common::logging::format_or_forward(__VA_ARGS__))); \
+                    hatchbed_common::logging::FormatOrForward{__FILE__, __LINE__}(__VA_ARGS__))); \
       condition_after \
     } \
   } while (0)

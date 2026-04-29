@@ -36,6 +36,7 @@
 #include <tuple>
 #include <utility>
 
+#include <fmt/chrono.h>
 #include <fmt/core.h>
 #include <fmt/format.h>
 #include <fmt/ranges.h>
