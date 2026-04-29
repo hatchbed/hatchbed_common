@@ -181,7 +181,7 @@ private:
             "twist", rclcpp::QoS(10));
 
         const auto period = std::chrono::duration<double>(1.0 / output_rate_);
-        output_timer_ = create_wall_timer(period, std::bind(&TwistMux::onOutputTimer, this));
+        output_timer_ = create_timer(period, std::bind(&TwistMux::onOutputTimer, this));
 
         RCLCPP_INFO(get_logger(), "TwistMux ready: %zu inputs, output at %.1f Hz.",
             inputs_.size(), output_rate_);
