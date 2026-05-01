@@ -305,7 +305,7 @@ template <> struct formatter<std_msgs::msg::ColorRGBA>
 // ambiguity with our custom DenseBase formatter below.
 template <typename T, typename Char>
 struct range_format_kind<T, Char, std::enable_if_t<std::is_base_of_v<Eigen::DenseBase<T>, T>>>
-    : std::integral_constant<range_format, range_format::disabled> {};
+    : std::integral_constant<fmt::range_format, fmt::range_format::disabled> {};
 
 template <typename T>
 struct formatter<T, char, std::enable_if_t<std::is_base_of_v<Eigen::DenseBase<T>, T>>>
