@@ -303,9 +303,17 @@ template <> struct formatter<std_msgs::msg::ColorRGBA>
 
 // Disable fmt's built-in range formatter for all Eigen dense types to avoid
 // ambiguity with our custom DenseBase formatter below.
+#if FMT_VERSION >= 90000
+// For fmt 9.x and newer (e.g., ROS 2 Iron, Jazzy, Rolling)
 template <typename T, typename Char>
 struct range_format_kind<T, Char, std::enable_if_t<std::is_base_of_v<Eigen::DenseBase<T>, T>>>
-    : std::integral_constant<fmt::range_format, fmt::range_format::disabled> {};
+    : std::integral_constant<range_format, range_format::disabled> {};
+#else
+// For fmt 8.x and older (e.g., ROS 2 Humble)
+template <typename T>
+struct is_range<T, std::enable_if_t<std::is_base_of_v<Eigen::DenseBase<T>, T>, char>>
+    : std::false_type {};
+#endif
 
 template <typename T>
 struct formatter<T, char, std::enable_if_t<std::is_base_of_v<Eigen::DenseBase<T>, T>>>
