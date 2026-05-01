@@ -102,12 +102,16 @@ class Parameter {
         const std::string& name,
         T default_val,
         const std::string& description,
-        std::shared_ptr<rclcpp::Node> node)
+        rclcpp::node_interfaces::NodeBaseInterface::SharedPtr base_if,
+        rclcpp::node_interfaces::NodeParametersInterface::SharedPtr params_if,
+        rclcpp::node_interfaces::NodeLoggingInterface::SharedPtr logging_if)
       : namespace_(ns),
         name_(name),
         default_val_(default_val),
         description_(description),
-        node_(node)
+        base_if_(base_if),
+        params_if_(params_if),
+        logging_if_(logging_if)
     {
         if (!store) {
             owned_store_ = std::make_shared<OwnedStore<T>>(default_val_);
@@ -184,7 +188,7 @@ class Parameter {
 
     virtual bool update(const T& value, bool from_callback = false) {
         if (initialized_ && !is_dynamic_) {
-            RCLCPP_WARN_STREAM(node_->get_logger(),
+            RCLCPP_WARN_STREAM(logging_if_->get_logger(),
                 namespace_ << "/" << name_ << " is static and can't be updated.");
             return false;
         }
@@ -194,7 +198,7 @@ class Parameter {
             std::scoped_lock lock(owned_store_->mutex);
             did_change = owned_store_->value != value;
             if (did_change && from_callback) {
-                RCLCPP_INFO_STREAM(node_->get_logger(),
+                RCLCPP_INFO_STREAM(logging_if_->get_logger(),
                     "updated <" << namespace_ << "/" << name_ << ">: "
                     << toString(owned_store_->value) << " to " << toString(value));
             }
@@ -203,7 +207,7 @@ class Parameter {
             std::scoped_lock lock(borrowed_store_->mutex);
             did_change = *borrowed_store_->value != value;
             if (did_change && from_callback) {
-                RCLCPP_INFO_STREAM(node_->get_logger(),
+                RCLCPP_INFO_STREAM(logging_if_->get_logger(),
                     "updated <" << namespace_ << "/" << name_ << ">: "
                     << toString(*borrowed_store_->value) <<" to " << toString(value));
             }
@@ -211,7 +215,8 @@ class Parameter {
         }
 
         if (!from_callback && did_change) {
-            node_->set_parameter({ name_, rclcpp::ParameterValue(this->value()) });
+            params_if_->set_parameters(
+                {rclcpp::Parameter(name_, rclcpp::ParameterValue(this->value()))});
         }
 
         if (user_callback_ && did_change) {
@@ -255,21 +260,22 @@ class Parameter {
         descriptor.read_only = !is_dynamic_;
 
         try {
-            node_->declare_parameter(name_, rclcpp::ParameterValue(default_val_), descriptor);
+            params_if_->declare_parameter(name_, rclcpp::ParameterValue(default_val_), descriptor);
         }
         catch (const rclcpp::exceptions::ParameterAlreadyDeclaredException& e) {
-            RCLCPP_WARN(node_->get_logger(), "Parameter [%s] already declared: %s",
+            RCLCPP_WARN(logging_if_->get_logger(), "Parameter [%s] already declared: %s",
                         name_.c_str(), e.what());
         }
 
         update(getParameter());
-        RCLCPP_INFO_STREAM(node_->get_logger(),
+        RCLCPP_INFO_STREAM(logging_if_->get_logger(),
             namespace_ << "/" << name_ << ": " << toString(value()));
         initialized_ = true;
     }
 
     T getParameter() {
-        auto p = node_->get_parameter(name_);
+        rclcpp::Parameter p;
+        params_if_->get_parameter(name_, p);
         return p.get_value<T>();
     }
 
@@ -277,7 +283,9 @@ class Parameter {
     std::string name_;
     T default_val_;
     std::string description_;
-    std::shared_ptr<rclcpp::Node> node_;
+    rclcpp::node_interfaces::NodeBaseInterface::SharedPtr base_if_;
+    rclcpp::node_interfaces::NodeParametersInterface::SharedPtr params_if_;
+    rclcpp::node_interfaces::NodeLoggingInterface::SharedPtr logging_if_;
     typename BorrowedStore<T>::Ptr borrowed_store_;
     typename OwnedStore<T>::Ptr owned_store_;
 
@@ -299,8 +307,10 @@ class NumericParameter : public Parameter<T> {
         const std::string& name,
         T default_val,
         const std::string& description,
-        std::shared_ptr<rclcpp::Node> node)
-      : Parameter<T>(store, ns, name, default_val, description, node) {}
+        rclcpp::node_interfaces::NodeBaseInterface::SharedPtr base_if,
+        rclcpp::node_interfaces::NodeParametersInterface::SharedPtr params_if,
+        rclcpp::node_interfaces::NodeLoggingInterface::SharedPtr logging_if)
+      : Parameter<T>(store, ns, name, default_val, description, base_if, params_if, logging_if) {}
 
     NumericParameter() = default;
     NumericParameter(const NumericParameter& parameter) = default;
@@ -377,8 +387,8 @@ class NumericParameter : public Parameter<T> {
     protected:
     bool checkRange(const U& value) const {
         if (has_range_ && (value < min_ || value > max_)) {
-            RCLCPP_WARN_STREAM(this->node_->get_logger(),  this->namespace_ << "/" << this->name_
-                               << ": value out of range <" << value << ">");
+            RCLCPP_WARN_STREAM(this->logging_if_->get_logger(),
+                this->namespace_ << "/" << this->name_ << ": value out of range <" << value << ">");
             return false;
         }
         return true;
@@ -412,17 +422,17 @@ class NumericParameter : public Parameter<T> {
             descriptor.floating_point_range[0].step = step_;
         }
         try {
-            this->node_->declare_parameter(
+            this->params_if_->declare_parameter(
                 this->name_, rclcpp::ParameterValue(this->default_val_), descriptor);
         }
         catch (const rclcpp::exceptions::ParameterAlreadyDeclaredException& e) {
-            RCLCPP_WARN(this->node_->get_logger(), "Parameter [%s] already declared: %s",
+            RCLCPP_WARN(this->logging_if_->get_logger(), "Parameter [%s] already declared: %s",
                         this->name_.c_str(), e.what());
         }
 
         this->update(this->getParameter());
 
-        RCLCPP_INFO_STREAM(this->node_->get_logger(),
+        RCLCPP_INFO_STREAM(this->logging_if_->get_logger(),
             this->namespace_ << "/" << this->name_ << ": " << this->toString(this->value()));
         this->initialized_ = true;
     }
@@ -447,8 +457,11 @@ class NumericIntParameter : public NumericParameter<T> {
         const std::string& name,
         T default_val,
         const std::string& description,
-        std::shared_ptr<rclcpp::Node> node)
-      : NumericParameter<T>(store, ns, name, default_val, description, node) {}
+        rclcpp::node_interfaces::NodeBaseInterface::SharedPtr base_if,
+        rclcpp::node_interfaces::NodeParametersInterface::SharedPtr params_if,
+        rclcpp::node_interfaces::NodeLoggingInterface::SharedPtr logging_if)
+      : NumericParameter<T>(
+          store, ns, name, default_val, description, base_if, params_if, logging_if) {}
 
     NumericIntParameter() = default;
     NumericIntParameter(const NumericIntParameter& parameter) = default;
@@ -571,17 +584,17 @@ class NumericIntParameter : public NumericParameter<T> {
         }
 
         try {
-            this->node_->declare_parameter(
+            this->params_if_->declare_parameter(
                 this->name_, rclcpp::ParameterValue(this->default_val_), descriptor);
         }
         catch (const rclcpp::exceptions::ParameterAlreadyDeclaredException& e) {
-            RCLCPP_INFO(this->node_->get_logger(), "Parameter [%s] already declared: %s",
+            RCLCPP_INFO(this->logging_if_->get_logger(), "Parameter [%s] already declared: %s",
                         this->name_.c_str(), e.what());
         }
 
         this->update(this->getParameter());
 
-        RCLCPP_INFO_STREAM(this->node_->get_logger(),
+        RCLCPP_INFO_STREAM(this->logging_if_->get_logger(),
             this->namespace_ << "/" << this->name_ << ": " << this->toString(this->value()));
         this->initialized_ = true;
     }

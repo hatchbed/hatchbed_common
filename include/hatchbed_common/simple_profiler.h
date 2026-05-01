@@ -411,6 +411,24 @@ inline void set_enabled(bool enabled) {
 #define profile_scope(name) \
     profile::SimpleProfiler::ScopedTimer PROFILE_CONCAT(timer, __COUNTER__)(name)
 
+// fmt formatter: allows ::profile::get() to be passed directly to fmt::format
+// and HB_INFO/HB_DEBUG etc. without a manual ostringstream.
+#include <fmt/format.h>
+
+namespace fmt {
+template <>
+struct formatter<profile::SimpleProfiler> {
+    constexpr auto parse(format_parse_context& ctx) const { return ctx.begin(); }
+
+    template <typename FormatContext>
+    auto format(const profile::SimpleProfiler& profiler, FormatContext& ctx) const {
+        std::ostringstream oss;
+        profiler.print(oss);
+        return fmt::format_to(ctx.out(), "{}", oss.str());
+    }
+};
+}  // namespace fmt
+
 #else
 
 namespace profile {
