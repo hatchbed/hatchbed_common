@@ -56,20 +56,17 @@
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2/LinearMath/Transform.h>
 
-// Workaround for a bug in fmt 8.x (ROS 2 Humble) where types with implicit pointer
+// Workaround for a bug in fmt 8.1.1 (ROS 2 Humble) where types with implicit pointer
 // conversions trigger a static_assert even when a valid formatter exists.
 #if FMT_VERSION < 90000
-namespace fmt {
-namespace detail {
-    // Trick fmt into bypassing the implicit pointer check for tf2 types to prevent
-    // the discarded static_assert("Formatting of non-void pointers is disallowed") from firing.
-    template <typename Char>
-    struct is_string_like<tf2::Vector3, Char> : std::true_type {};
+namespace std {
+    // Trick fmt 8 into ignoring the implicit tf2Scalar* (double*) conversion
+    template <> struct is_convertible<tf2::Vector3, const void*> : std::false_type {};
+    template <> struct is_convertible<const tf2::Vector3&, const void*> : std::false_type {};
 
-    template <typename Char>
-    struct is_string_like<tf2::Quaternion, Char> : std::true_type {};
-}  // namespace detail
-}  // namespace fmt
+    template <> struct is_convertible<tf2::Quaternion, const void*> : std::false_type {};
+    template <> struct is_convertible<const tf2::Quaternion&, const void*> : std::false_type {};
+}
 #endif
 
 namespace hatchbed_common {
