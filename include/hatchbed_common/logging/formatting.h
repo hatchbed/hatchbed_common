@@ -35,6 +35,7 @@
 #include <string>
 #include <tuple>
 #include <utility>
+#include <variant>
 
 #include <fmt/chrono.h>
 #include <fmt/core.h>
