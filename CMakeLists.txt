@@ -192,6 +192,11 @@ if(BUILD_TESTING)
   ament_cpplint(FILTERS "-build/include_order" MAX_LINE_LENGTH 100)
 
   find_package(ament_cmake_gtest REQUIRED)
+  find_package(rclcpp_lifecycle REQUIRED)
+
+  ament_add_gtest(test_param_handler test/test_param_handler.cpp)
+  target_link_libraries(test_param_handler hatchbed_common rclcpp_lifecycle::rclcpp_lifecycle)
+
   ament_add_gtest(test_ros_names test/test_ros_names.cpp)
   target_link_libraries(test_ros_names hatchbed_common)
 

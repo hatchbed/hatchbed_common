@@ -29,6 +29,7 @@
 #pragma once
 
 #include <limits>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <unordered_map>
@@ -75,14 +76,19 @@ namespace hatchbed_common {
  */
 class ParamHandler {
   public:
-    explicit ParamHandler(rclcpp::Node::SharedPtr node) :
-      node_(node),
-      namespace_(node_->get_fully_qualified_name()),
-      verbose_param_(false)
+    // Accepts rclcpp::Node::SharedPtr, rclcpp_lifecycle::LifecycleNode::SharedPtr, or any
+    // other node type that exposes the standard node interfaces.
+    template <typename NodeT>
+    explicit ParamHandler(std::shared_ptr<NodeT> node)
+      : base_if_(node->get_node_base_interface()),
+        params_if_(node->get_node_parameters_interface()),
+        logging_if_(node->get_node_logging_interface()),
+        namespace_(base_if_->get_fully_qualified_name()),
+        verbose_param_(false)
     {
-      params_callback_handle_ = node_->add_on_set_parameters_callback(
+      params_callback_handle_ = params_if_->add_on_set_parameters_callback(
         std::bind(&ParamHandler::parametersCallback, this, std::placeholders::_1));
-    };
+    }
 
     ~ParamHandler() = default;
 
@@ -97,7 +103,8 @@ class ParamHandler {
         verbose_param_ = true;
 
         // determine the default verbose setting based on the current log level
-        auto log_level = rcutils_logging_get_logger_level(node_->get_logger().get_name());
+        auto log_level = rcutils_logging_get_logger_level(
+            logging_if_->get_logger().get_name());
         bool is_verbose = log_level == RCUTILS_LOG_SEVERITY_DEBUG;
         if (is_verbose) {
             non_verbose_level_ = log_level;
@@ -105,20 +112,21 @@ class ParamHandler {
 
         param("verbose", is_verbose, "Enable debug logging").callback(
             [this](const bool& value) {
-                RCLCPP_INFO_STREAM(node_->get_logger(),
+                RCLCPP_INFO_STREAM(logging_if_->get_logger(),
                     "setting verbose logging: " << (value ? "true" : "false"));
                 if (value) {
                     auto ret = rcutils_logging_set_logger_level(
-                        node_->get_logger().get_name(), RCUTILS_LOG_SEVERITY_DEBUG);
+                        logging_if_->get_logger().get_name(), RCUTILS_LOG_SEVERITY_DEBUG);
                     if (ret != RCUTILS_RET_OK) {
-                        RCLCPP_WARN_STREAM(node_->get_logger(),
+                        RCLCPP_WARN_STREAM(logging_if_->get_logger(),
                             "Failed to set log level to debug");
                     }
                 } else {
                     auto ret = rcutils_logging_set_logger_level(
-                        node_->get_logger().get_name(), non_verbose_level_);
+                        logging_if_->get_logger().get_name(), non_verbose_level_);
                     if (ret != RCUTILS_RET_OK) {
-                        RCLCPP_WARN_STREAM(node_->get_logger(), "Failed to set log level");
+                        RCLCPP_WARN_STREAM(logging_if_->get_logger(),
+                            "Failed to set log level");
                     }
                 }
             }).declare();
@@ -140,7 +148,7 @@ class ParamHandler {
     {
         std::scoped_lock lock(mutex_);
         bool_params_[name] = BoolParameter(nullptr, namespace_, name, default_val, description,
-            node_);
+            base_if_, params_if_, logging_if_);
         return bool_params_[name];
     }
 
@@ -168,7 +176,7 @@ class ParamHandler {
     {
         std::scoped_lock lock(mutex_);
         bool_params_[name] = BoolParameter(param, namespace_, name, default_val, description,
-            node_);
+            base_if_, params_if_, logging_if_);
         return bool_params_[name];
     }
 
@@ -188,7 +196,7 @@ class ParamHandler {
     {
         std::scoped_lock lock(mutex_);
         bool_array_params_[name] = BoolArrayParameter(nullptr, namespace_, name, default_val,
-            description, node_);
+            description, base_if_, params_if_, logging_if_);
         return bool_array_params_[name];
     }
 
@@ -216,7 +224,7 @@ class ParamHandler {
     {
         std::scoped_lock lock(mutex_);
         bool_array_params_[name] = BoolArrayParameter(param, namespace_, name, default_val,
-            description, node_);
+            description, base_if_, params_if_, logging_if_);
         return bool_array_params_[name];
     }
 
@@ -240,7 +248,7 @@ class ParamHandler {
     {
         std::scoped_lock lock(mutex_);
         system_int_params_[name] = SystemIntParameter(nullptr, namespace_, name, default_val,
-            description, node_);
+            description, base_if_, params_if_, logging_if_);
         return system_int_params_[name];
     }
 
@@ -272,7 +280,7 @@ class ParamHandler {
     {
         std::scoped_lock lock(mutex_);
         system_int_params_[name] = SystemIntParameter(param, namespace_, name, default_val,
-            description, node_);
+            description, base_if_, params_if_, logging_if_);
         return system_int_params_[name];
     }
 
@@ -292,7 +300,7 @@ class ParamHandler {
     {
         std::scoped_lock lock(mutex_);
         int_params_[name] = IntParameter(nullptr, namespace_, name, default_val, description,
-            node_);
+            base_if_, params_if_, logging_if_);
         return int_params_[name];
     }
 
@@ -319,7 +327,8 @@ class ParamHandler {
         const std::string& description)
     {
         std::scoped_lock lock(mutex_);
-        int_params_[name] = IntParameter(param, namespace_, name, default_val, description, node_);
+        int_params_[name] = IntParameter(param, namespace_, name, default_val, description,
+            base_if_, params_if_, logging_if_);
         return int_params_[name];
     }
 
@@ -339,7 +348,7 @@ class ParamHandler {
     {
         std::scoped_lock lock(mutex_);
         int_array_params_[name] = IntArrayParameter(nullptr, namespace_, name, default_val,
-            description, node_);
+            description, base_if_, params_if_, logging_if_);
         return int_array_params_[name];
     }
 
@@ -367,7 +376,7 @@ class ParamHandler {
     {
         std::scoped_lock lock(mutex_);
         int_array_params_[name] = IntArrayParameter(param, namespace_, name, default_val,
-            description, node_);
+            description, base_if_, params_if_, logging_if_);
         return int_array_params_[name];
     }
 
@@ -387,7 +396,7 @@ class ParamHandler {
     {
         std::scoped_lock lock(mutex_);
         double_params_[name] = DoubleParameter(nullptr, namespace_, name, default_val, description,
-            node_);
+            base_if_, params_if_, logging_if_);
         return double_params_[name];
     }
 
@@ -415,7 +424,7 @@ class ParamHandler {
     {
         std::scoped_lock lock(mutex_);
         double_params_[name] = DoubleParameter(param, namespace_, name, default_val, description,
-            node_);
+            base_if_, params_if_, logging_if_);
         return double_params_[name];
     }
 
@@ -435,7 +444,7 @@ class ParamHandler {
     {
         std::scoped_lock lock(mutex_);
         double_array_params_[name] = DoubleArrayParameter(nullptr, namespace_, name, default_val,
-            description, node_);
+            description, base_if_, params_if_, logging_if_);
         return double_array_params_[name];
     }
 
@@ -463,7 +472,7 @@ class ParamHandler {
     {
         std::scoped_lock lock(mutex_);
         double_array_params_[name] = DoubleArrayParameter(param, namespace_, name, default_val,
-            description, node_);
+            description, base_if_, params_if_, logging_if_);
         return double_array_params_[name];
     }
 
@@ -483,7 +492,7 @@ class ParamHandler {
     {
         std::scoped_lock lock(mutex_);
         string_params_[name] = StringParameter(nullptr, namespace_, name, default_val, description,
-            node_);
+            base_if_, params_if_, logging_if_);
         return string_params_[name];
     }
 
@@ -511,7 +520,7 @@ class ParamHandler {
     {
         std::scoped_lock lock(mutex_);
         string_params_[name] = StringParameter(param, namespace_, name, default_val, description,
-            node_);
+            base_if_, params_if_, logging_if_);
         return string_params_[name];
     }
 
@@ -531,7 +540,7 @@ class ParamHandler {
     {
         std::scoped_lock lock(mutex_);
         string_array_params_[name] = StringArrayParameter(nullptr, namespace_, name, default_val,
-            description, node_);
+            description, base_if_, params_if_, logging_if_);
         return string_array_params_[name];
     }
 
@@ -559,7 +568,7 @@ class ParamHandler {
     {
         std::scoped_lock lock(mutex_);
         string_array_params_[name] = StringArrayParameter(param, namespace_, name, default_val,
-            description, node_);
+            description, base_if_, params_if_, logging_if_);
         return string_array_params_[name];
     }
 
@@ -568,7 +577,9 @@ class ParamHandler {
     }
 
 private:
-  rclcpp::Node::SharedPtr node_;
+  rclcpp::node_interfaces::NodeBaseInterface::SharedPtr base_if_;
+  rclcpp::node_interfaces::NodeParametersInterface::SharedPtr params_if_;
+  rclcpp::node_interfaces::NodeLoggingInterface::SharedPtr logging_if_;
   std::string namespace_;
   bool verbose_param_;
   int non_verbose_level_ = RCUTILS_LOG_SEVERITY_INFO;
@@ -692,7 +703,7 @@ private:
     }
 
     if (!result.successful) {
-        RCLCPP_WARN_STREAM(node_->get_logger(), result.reason);
+        RCLCPP_WARN_STREAM(logging_if_->get_logger(), result.reason);
     }
 
     return result;
