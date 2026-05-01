@@ -2,6 +2,11 @@
 Changelog for package hatchbed_common
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Humble build fixes. (`#15 <https://github.com/hatchbed/hatchbed_common/issues/15>`_)
+* Contributors: Marc Alban
+
 0.1.6 (2026-05-01)
 ------------------
 * ParamHandler now accepts rclcpp_lifecycle::LifecycleNode via a template constructor that
