@@ -49,6 +49,7 @@ target_link_libraries(hatchbed_common_logging INTERFACE
   ${sensor_msgs_TARGETS}
   ${tf2_msgs_TARGETS}
   ${visualization_msgs_TARGETS})
+target_compile_features(hatchbed_common_logging INTERFACE cxx_std_17)
 add_library(hatchbed_common::logging ALIAS hatchbed_common_logging)
 
 # -----------------------------------------------------------------------------
