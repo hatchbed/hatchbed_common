@@ -2,8 +2,8 @@
 Changelog for package hatchbed_common
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+0.1.7 (2026-05-01)
+------------------
 * Humble build fixes. (`#15 <https://github.com/hatchbed/hatchbed_common/issues/15>`_)
 * Contributors: Marc Alban
 
