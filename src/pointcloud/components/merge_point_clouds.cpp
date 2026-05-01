@@ -118,8 +118,9 @@ private:
 
     pub_ = create_publisher<sensor_msgs::msg::PointCloud2>("points_out", 10);
 
-    const auto period = std::chrono::duration<double>(1.0 / output_rate_);
-    output_timer_ = create_timer(period, std::bind(&MergePointClouds::onTimer, this));
+    output_timer_ = rclcpp::create_timer(this, get_clock(),
+                                         rclcpp::Duration::from_seconds(1.0 / output_rate_),
+                                         std::bind(&MergePointClouds::onTimer, this));
 
     RCLCPP_INFO(get_logger(), "[merge_point_clouds] Initialized: %zu inputs at %.1f Hz.",
                 inputs_.size(), output_rate_);

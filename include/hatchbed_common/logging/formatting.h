@@ -35,6 +35,7 @@
 #include <string>
 #include <tuple>
 #include <utility>
+#include <variant>
 
 #include <fmt/chrono.h>
 #include <fmt/core.h>
@@ -54,6 +55,19 @@
 #include <tf2/LinearMath/Vector3.h>
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2/LinearMath/Transform.h>
+
+// Workaround for a bug in fmt 8.1.1 (ROS 2 Humble) where types with implicit pointer
+// conversions trigger a static_assert even when a valid formatter exists.
+#if FMT_VERSION < 90000
+namespace std {
+    // Trick fmt 8 into ignoring the implicit tf2Scalar* (double*) conversion
+    template <> struct is_convertible<tf2::Vector3, const void*> : std::false_type {};
+    template <> struct is_convertible<const tf2::Vector3&, const void*> : std::false_type {};
+
+    template <> struct is_convertible<tf2::Quaternion, const void*> : std::false_type {};
+    template <> struct is_convertible<const tf2::Quaternion&, const void*> : std::false_type {};
+}
+#endif
 
 namespace hatchbed_common {
 namespace logging {
@@ -302,9 +316,17 @@ template <> struct formatter<std_msgs::msg::ColorRGBA>
 
 // Disable fmt's built-in range formatter for all Eigen dense types to avoid
 // ambiguity with our custom DenseBase formatter below.
+#if FMT_VERSION >= 90000
+// For fmt 9.x and newer (e.g., ROS 2 Iron, Jazzy, Rolling)
 template <typename T, typename Char>
 struct range_format_kind<T, Char, std::enable_if_t<std::is_base_of_v<Eigen::DenseBase<T>, T>>>
     : std::integral_constant<range_format, range_format::disabled> {};
+#else
+// For fmt 8.x and older (e.g., ROS 2 Humble)
+template <typename T>
+struct is_range<T, std::enable_if_t<std::is_base_of_v<Eigen::DenseBase<T>, T>, char>>
+    : std::false_type {};
+#endif
 
 template <typename T>
 struct formatter<T, char, std::enable_if_t<std::is_base_of_v<Eigen::DenseBase<T>, T>>>
