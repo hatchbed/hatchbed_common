@@ -102,19 +102,32 @@ rclcpp_components_register_node(hatchbed_common_localization
 # -----------------------------------------------------------------------------
 add_library(hatchbed_common_pointcloud SHARED
   src/pointcloud/components/crop_box.cpp
+  src/pointcloud/components/crop_radius.cpp
+  src/pointcloud/components/merge_point_clouds.cpp
   src/pointcloud/point_cloud2_util.cpp)
 set_target_properties(hatchbed_common_pointcloud PROPERTIES EXPORT_NAME pointcloud)
 target_link_libraries(hatchbed_common_pointcloud PUBLIC
   hatchbed_common
   Eigen3::Eigen
+  ${geometry_msgs_TARGETS}
   ${rclcpp_components_TARGETS}
   ${sensor_msgs_TARGETS}
+  tf2::tf2
+  tf2_ros::tf2_ros
   ${visualization_msgs_TARGETS})
 add_library(hatchbed_common::pointcloud ALIAS hatchbed_common_pointcloud)
 
 rclcpp_components_register_node(hatchbed_common_pointcloud
   PLUGIN "hatchbed_common::pointcloud::CropBox"
   EXECUTABLE crop_box_node)
+
+rclcpp_components_register_node(hatchbed_common_pointcloud
+  PLUGIN "hatchbed_common::pointcloud::CropRadius"
+  EXECUTABLE crop_radius_node)
+
+rclcpp_components_register_node(hatchbed_common_pointcloud
+  PLUGIN "hatchbed_common::pointcloud::MergePointClouds"
+  EXECUTABLE merge_point_clouds)
 
 # -----------------------------------------------------------------------------
 # Example
@@ -143,6 +156,8 @@ install(TARGETS
   tf_reroot
   twist_mux
   crop_box_node
+  crop_radius_node
+  merge_point_clouds
   RUNTIME DESTINATION lib/${PROJECT_NAME})
 
 install(TARGETS example_node
