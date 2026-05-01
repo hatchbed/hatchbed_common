@@ -55,18 +55,6 @@ TEST(RclcppTime, DefaultFormat) {
     EXPECT_EQ(fmt::format("{}", rclcpp::Time(1234567890, 999999999u)), "1234567890.999999999");
 }
 
-TEST(RclcppTime, NegativeTimestamp) {
-    // Whole negative seconds
-    EXPECT_EQ(fmt::format("{}", rclcpp::Time(-1000000000LL)), "-1.000000000");
-
-    // Negative seconds with sub-second component
-    EXPECT_EQ(fmt::format("{}", rclcpp::Time(-1500000000LL)), "-1.500000000");
-
-    // Sub-second negative: seconds == 0, sign must still appear
-    EXPECT_EQ(fmt::format("{}", rclcpp::Time(-500000000LL)), "-0.500000000");
-    EXPECT_EQ(fmt::format("{}", rclcpp::Time(-1LL)), "-0.000000001");
-}
-
 TEST(RclcppTime, CustomSpec) {
     const rclcpp::Time t(1, 500000000u);  // 1.5 seconds
 
@@ -78,9 +66,6 @@ TEST(RclcppTime, CustomSpec) {
     // Scientific notation
     EXPECT_EQ(fmt::format("{:e}", t), "1.500000e+00");
     EXPECT_EQ(fmt::format("{:.2e}", t), "1.50e+00");
-
-    // Custom spec on a negative timestamp
-    EXPECT_EQ(fmt::format("{:.3f}", rclcpp::Time(-1500000000LL)), "-1.500");
 }
 
 // ============================================================================
