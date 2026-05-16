@@ -44,18 +44,28 @@ struct LogRecord {
     int severity;
     std::string name;
     std::string message;
+    std::string filename;
+    std::string function;
+    size_t line = 0;
 };
 
 static std::vector<LogRecord> g_log_records;
 
 void custom_log_handler(
-    const rcutils_log_location_t *,
+    const rcutils_log_location_t * location,
     int severity, const char * name, rcutils_time_point_value_t,
     const char * format, va_list * args)
 {
     char buffer[1024];
     vsnprintf(buffer, sizeof(buffer), format, *args);
-    g_log_records.push_back({severity, name ? name : "", buffer});
+    g_log_records.push_back({
+        severity,
+        name ? name : "",
+        buffer,
+        location && location->file_name     ? location->file_name     : "",
+        location && location->function_name ? location->function_name : "",
+        location ? location->line_number : 0,
+    });
 }
 
 class LoggingTest : public ::testing::Test {
@@ -414,6 +424,86 @@ TEST_F(LoggingTest, MacroRuntimeFormatErrorExpression) {
 
     ASSERT_EQ(g_log_records.size(), 2u);
     EXPECT_TRUE(g_log_records[1].message.find("[LOGGING ERROR:") != std::string::npos);
+}
+
+// ============================================================================
+// 11. EXPLICIT-LOCATION FREE FUNCTIONS
+// ============================================================================
+
+namespace hbl = hatchbed_common::logging;
+
+TEST_F(LoggingTest, LogAtPreformatted) {
+    hbl::log_at(nullptr, RCUTILS_LOG_SEVERITY_INFO, "myfile.cpp", "myFunc", 42, "hello");
+    ASSERT_EQ(g_log_records.size(), 1u);
+    EXPECT_EQ(g_log_records[0].message,  "hello");
+    EXPECT_EQ(g_log_records[0].severity, RCUTILS_LOG_SEVERITY_INFO);
+    EXPECT_EQ(g_log_records[0].filename, "myfile.cpp");
+    EXPECT_EQ(g_log_records[0].function, "myFunc");
+    EXPECT_EQ(g_log_records[0].line,     42u);
+}
+
+TEST_F(LoggingTest, FreeFunctionAllLevels) {
+    hbl::debug(nullptr, "f.cpp", "fn", 1, std::string("dbg"));
+    hbl::info (nullptr, "f.cpp", "fn", 2, std::string("inf"));
+    hbl::warn (nullptr, "f.cpp", "fn", 3, std::string("wrn"));
+    hbl::error(nullptr, "f.cpp", "fn", 4, std::string("err"));
+    hbl::fatal(nullptr, "f.cpp", "fn", 5, std::string("fat"));
+
+    ASSERT_EQ(g_log_records.size(), 5u);
+    EXPECT_EQ(g_log_records[0].severity, RCUTILS_LOG_SEVERITY_DEBUG);
+    EXPECT_EQ(g_log_records[1].severity, RCUTILS_LOG_SEVERITY_INFO);
+    EXPECT_EQ(g_log_records[2].severity, RCUTILS_LOG_SEVERITY_WARN);
+    EXPECT_EQ(g_log_records[3].severity, RCUTILS_LOG_SEVERITY_ERROR);
+    EXPECT_EQ(g_log_records[4].severity, RCUTILS_LOG_SEVERITY_FATAL);
+}
+
+TEST_F(LoggingTest, FreeFunctionFmtFormatting) {
+    hbl::warn(nullptr, "src.cpp", "myFunc", 99, "val={} str={}", 7, std::string("hi"));
+    ASSERT_EQ(g_log_records.size(), 1u);
+    EXPECT_EQ(g_log_records[0].message,  "val=7 str=hi");
+    EXPECT_EQ(g_log_records[0].severity, RCUTILS_LOG_SEVERITY_WARN);
+    EXPECT_EQ(g_log_records[0].filename, "src.cpp");
+    EXPECT_EQ(g_log_records[0].function, "myFunc");
+    EXPECT_EQ(g_log_records[0].line,     99u);
+}
+
+TEST_F(LoggingTest, FreeFunctionExplicitLogger) {
+    rclcpp::Logger logger = rclcpp::get_logger("free_fn_test");
+    hbl::info(logger, "a.cpp", "fn", 1, std::string("routed"));
+    ASSERT_EQ(g_log_records.size(), 1u);
+    EXPECT_EQ(g_log_records[0].name, "free_fn_test");
+    EXPECT_EQ(g_log_records[0].message, "routed");
+}
+
+TEST_F(LoggingTest, FreeFunctionNoLoggerUsesDefault) {
+    auto node = std::make_shared<rclcpp::Node>("free_default");
+    set_default_logger(node->get_logger());
+    g_log_records.clear();
+
+    hbl::info("b.cpp", "fn", 10, std::string("via default"));
+    ASSERT_EQ(g_log_records.size(), 1u);
+    EXPECT_EQ(g_log_records[0].name,    "free_default");
+    EXPECT_EQ(g_log_records[0].message, "via default");
+    EXPECT_EQ(g_log_records[0].line,    10u);
+}
+
+TEST_F(LoggingTest, FreeFunctionNoLoggerFmt) {
+    hbl::warn("c.cpp", "fn", 5, "x={}", 42);
+    ASSERT_EQ(g_log_records.size(), 1u);
+    EXPECT_EQ(g_log_records[0].message, "x=42");
+    EXPECT_EQ(g_log_records[0].severity, RCUTILS_LOG_SEVERITY_WARN);
+    EXPECT_EQ(g_log_records[0].filename, "c.cpp");
+    EXPECT_EQ(g_log_records[0].line,    5u);
+}
+
+TEST_F(LoggingTest, FreeFunctionSeverityFiltering) {
+    rcutils_logging_set_default_logger_level(RCUTILS_LOG_SEVERITY_WARN);
+    hbl::debug(nullptr, "f.cpp", "fn", 1, std::string("filtered"));
+    hbl::info (nullptr, "f.cpp", "fn", 2, std::string("filtered"));
+    EXPECT_EQ(g_log_records.size(), 0u);
+    hbl::warn (nullptr, "f.cpp", "fn", 3, std::string("passes"));
+    ASSERT_EQ(g_log_records.size(), 1u);
+    EXPECT_EQ(g_log_records[0].message, "passes");
 }
 
 int main(int argc, char ** argv) {
