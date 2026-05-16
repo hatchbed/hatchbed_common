@@ -188,6 +188,8 @@ TEST(GetFieldIterator, ConstIteratorInvalidForWrongType) {
     EXPECT_FALSE(static_cast<bool>(iter));
 }
 
+#include <unistd.h>
+
 TEST(GetFieldIterator, MutableIteratorCanWrite) {
     auto cloud = makeCloud({{1.f, 2.f, 3.f, 0u}});
     auto iter = getFieldIterator<float>(cloud, "x");
