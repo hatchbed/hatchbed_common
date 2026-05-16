@@ -110,6 +110,12 @@ bool hasField(const sensor_msgs::msg::PointCloud2 & cloud, const std::string & f
   return it != cloud.fields.end() && it->datatype == point_field_type<T>::value;
 }
 
+// Returns true if cloud has x, y, z fields of type FLOAT32.
+inline bool hasXYZFloat(const sensor_msgs::msg::PointCloud2& cloud) {
+    return hasField<float>(cloud, "x") && hasField<float>(cloud, "y") &&
+           hasField<float>(cloud, "z");
+}
+
 // Returns a FieldIterator<T> (read-only) for the named field if it exists and
 // its datatype matches T, or an invalid iterator (evaluates to false) otherwise.
 template <typename T>

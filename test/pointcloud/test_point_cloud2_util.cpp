@@ -36,6 +36,7 @@
 #include <sensor_msgs/point_cloud2_iterator.hpp>
 
 using hatchbed_common::pointcloud::hasField;
+using hatchbed_common::pointcloud::hasXYZFloat;
 using hatchbed_common::pointcloud::getFieldIterator;
 using hatchbed_common::pointcloud::transformAndDeskewPointCloud;
 using hatchbed_common::pointcloud::transformPointCloud;
@@ -119,6 +120,52 @@ TEST(HasField, ReturnsFalseForWrongType) {
 }
 
 // =============================================================================
+// hasXYZFloat
+// =============================================================================
+
+TEST(HasXYZFloat, AllThreeFloatFields) {
+    auto cloud = makeCloud({{1.f, 2.f, 3.f, 0u}});
+    EXPECT_TRUE(hasXYZFloat(cloud));
+}
+
+TEST(HasXYZFloat, MissingZField) {
+    sensor_msgs::msg::PointCloud2 cloud;
+    cloud.height = 1; cloud.width = 1;
+    auto addField = [&](const std::string& name, uint32_t offset) {
+        sensor_msgs::msg::PointField f;
+        f.name = name; f.offset = offset;
+        f.datatype = sensor_msgs::msg::PointField::FLOAT32; f.count = 1;
+        cloud.fields.push_back(f);
+    };
+    addField("x", 0); addField("y", 4);
+    cloud.point_step = 8; cloud.row_step = 8;
+    cloud.data.resize(8, 0);
+    EXPECT_FALSE(hasXYZFloat(cloud));
+}
+
+TEST(HasXYZFloat, XIsFloat64NotFloat32) {
+    sensor_msgs::msg::PointCloud2 cloud;
+    cloud.height = 1; cloud.width = 1;
+
+    auto addFloatField = [&](const std::string& name, uint32_t offset) {
+        sensor_msgs::msg::PointField f;
+        f.name = name; f.offset = offset;
+        f.datatype = sensor_msgs::msg::PointField::FLOAT32; f.count = 1;
+        cloud.fields.push_back(f);
+    };
+
+    sensor_msgs::msg::PointField fx;
+    fx.name = "x"; fx.offset = 0;
+    fx.datatype = sensor_msgs::msg::PointField::FLOAT64; fx.count = 1;
+    cloud.fields.push_back(fx);
+    addFloatField("y", 8);
+    addFloatField("z", 12);
+    cloud.point_step = 16; cloud.row_step = 16;
+    cloud.data.resize(16, 0);
+    EXPECT_FALSE(hasXYZFloat(cloud));
+}
+
+// =============================================================================
 // getFieldIterator (const / mutable)
 // =============================================================================
 
@@ -140,6 +187,8 @@ TEST(GetFieldIterator, ConstIteratorInvalidForWrongType) {
     auto iter = getFieldIterator<double>(cloud, "x");
     EXPECT_FALSE(static_cast<bool>(iter));
 }
+
+#include <unistd.h>
 
 TEST(GetFieldIterator, MutableIteratorCanWrite) {
     auto cloud = makeCloud({{1.f, 2.f, 3.f, 0u}});

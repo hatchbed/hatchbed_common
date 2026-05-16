@@ -176,3 +176,5 @@ public:
 
 }  // namespace logging
 }  // namespace hatchbed_common
+
+#include <hatchbed_common/logging/functions.h>

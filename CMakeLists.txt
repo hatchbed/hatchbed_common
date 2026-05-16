@@ -105,7 +105,9 @@ add_library(hatchbed_common_pointcloud SHARED
   src/pointcloud/components/crop_box.cpp
   src/pointcloud/components/crop_radius.cpp
   src/pointcloud/components/merge_point_clouds.cpp
-  src/pointcloud/point_cloud2_util.cpp)
+  src/pointcloud/convex_hull_2d.cpp
+  src/pointcloud/point_cloud2_util.cpp
+  src/pointcloud/convex_prism.cpp)
 set_target_properties(hatchbed_common_pointcloud PROPERTIES EXPORT_NAME pointcloud)
 target_link_libraries(hatchbed_common_pointcloud PUBLIC
   hatchbed_common
@@ -209,6 +211,12 @@ if(BUILD_TESTING)
 
   ament_add_gtest(test_point_cloud2_util test/pointcloud/test_point_cloud2_util.cpp)
   target_link_libraries(test_point_cloud2_util hatchbed_common_pointcloud)
+
+  ament_add_gtest(test_convex_hull_2d test/pointcloud/test_convex_hull_2d.cpp)
+  target_link_libraries(test_convex_hull_2d hatchbed_common_pointcloud)
+
+  ament_add_gtest(test_convex_prism test/pointcloud/test_convex_prism.cpp)
+  target_link_libraries(test_convex_prism hatchbed_common_pointcloud)
 
   ament_add_gtest(test_logging test/logging/test_logging.cpp)
   target_link_libraries(test_logging hatchbed_common_logging)
