@@ -27,14 +27,14 @@
 // POSSIBILITY OF SUCH DAMAGE.
 
 #include <gtest/gtest.h>
-#include <hatchbed_common/localization/covariance_util.h>
+#include <hatchbed_common/transforms/covariance_util.h>
 #include <Eigen/Geometry>
 #include <tf2/LinearMath/Quaternion.hpp>
 #include <array>
 #include <cmath>
 
-using hatchbed_common::localization::Covariance;
-using hatchbed_common::localization::rotateCovariance;
+using hatchbed_common::transforms::Covariance;
+using hatchbed_common::transforms::rotateCovariance;
 
 // Helper to compare two covariance arrays element-wise
 void expectCovarianceNear(const Covariance& a, const Covariance& b, double tol = 1e-9)

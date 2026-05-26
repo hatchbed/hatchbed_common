@@ -37,6 +37,7 @@
 #include <Eigen/Geometry>
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <hatchbed_common/param_handler.h>
+#include <hatchbed_common/transforms/transform_util.h>
 #include <hatchbed_common/pointcloud/point_cloud2_util.hpp>
 #include <hatchbed_common/ros_names.h>
 #include <rclcpp/rclcpp.hpp>
@@ -160,16 +161,6 @@ private:
     inputs_.push_back(std::move(entry));
   }
 
-  static Eigen::Isometry3d toIsometry(const geometry_msgs::msg::TransformStamped & tf)
-  {
-    Eigen::Isometry3d T = Eigen::Isometry3d::Identity();
-    const auto & t = tf.transform.translation;
-    const auto & r = tf.transform.rotation;
-    T.translation() = Eigen::Vector3d(t.x, t.y, t.z);
-    T.linear() = Eigen::Quaterniond(r.w, r.x, r.y, r.z).toRotationMatrix();
-    return T;
-  }
-
   void onTimer()
   {
     std::vector<Eigen::Vector3f> merged;
@@ -199,7 +190,7 @@ private:
         try {
           auto tf = tf_buffer_->lookupTransform(
             output_frame_, cloud.header.frame_id, tf2::TimePointZero);
-          T = toIsometry(tf);
+          T = hatchbed_common::transforms::toIsometry(tf);
         } catch (const tf2::TransformException & ex) {
           RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
             "[merge_point_clouds] Could not transform input '%s': %s",

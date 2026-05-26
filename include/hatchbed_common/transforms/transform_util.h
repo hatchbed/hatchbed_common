@@ -28,23 +28,21 @@
 
 #pragma once
 
-#include <array>
-
-#include <tf2/LinearMath/Quaternion.hpp>
+#include <Eigen/Geometry>
+#include <geometry_msgs/msg/transform_stamped.hpp>
 
 namespace hatchbed_common {
-namespace localization {
+namespace transforms {
 
-using Covariance = std::array<double, 36>;
+// Convert a geometry_msgs TransformStamped to an Eigen::Isometry3d.
+inline Eigen::Isometry3d toIsometry(const geometry_msgs::msg::TransformStamped& tf) {
+    Eigen::Isometry3d T = Eigen::Isometry3d::Identity();
+    const auto& t = tf.transform.translation;
+    const auto& r = tf.transform.rotation;
+    T.translation() = Eigen::Vector3d(t.x, t.y, t.z);
+    T.linear() = Eigen::Quaterniond(r.w, r.x, r.y, r.z).toRotationMatrix();
+    return T;
+}
 
-/**
- * Rotates a 6x6 covariance matrix by a rotation, applying it to both the
- * translational and rotational components.
- *
- * C_out = J * C_in * J^T,
- * where J = diag(R, R) (block diagonal with rotation matrix R)
- */
-Covariance rotateCovariance(const Covariance& cov_in, const tf2::Quaternion& q);
-
-}  // namespace localization
+}  // namespace transforms
 }  // namespace hatchbed_common

@@ -26,12 +26,12 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-#include <hatchbed_common/localization/pose_buffer.h>
+#include <hatchbed_common/transforms/pose_buffer.h>
 
 #include <algorithm>
 
 namespace hatchbed_common {
-namespace localization {
+namespace transforms {
 
 PoseBuffer::PoseBuffer(double max_age) : max_age_(max_age) {}
 
@@ -123,5 +123,5 @@ void   PoseBuffer::clear() { buffer_.clear(); }
 bool   PoseBuffer::empty() const { return buffer_.empty(); }
 size_t PoseBuffer::size()  const { return buffer_.size(); }
 
-}  // namespace localization
+}  // namespace transforms
 }  // namespace hatchbed_common

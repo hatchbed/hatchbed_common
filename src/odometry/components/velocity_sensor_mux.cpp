@@ -45,7 +45,7 @@
 #include <sensor_msgs/msg/imu.hpp>
 
 namespace hatchbed_common {
-namespace localization {
+namespace odometry {
 
 static constexpr int    kNumAxes        = 6;
 static constexpr double kHighCovariance = 1e9;
@@ -96,14 +96,14 @@ static int axisFromName(const std::string& name) {
  *                                       May be shorter than axes; remaining
  *                                       axes are not overridden.
  */
-class TwistMux : public rclcpp::Node {
+class VelocitySensorMux : public rclcpp::Node {
 public:
-    explicit TwistMux(const rclcpp::NodeOptions& options)
-    : Node("twist_mux", options)
+    explicit VelocitySensorMux(const rclcpp::NodeOptions& options)
+    : Node("velocity_sensor_mux", options)
     {
         init_timer_ = create_wall_timer(
             std::chrono::milliseconds(100),
-            std::bind(&TwistMux::onInit, this));
+            std::bind(&VelocitySensorMux::onInit, this));
     }
 
 private:
@@ -182,10 +182,10 @@ private:
 
         output_timer_ = rclcpp::create_timer(this, get_clock(),
                                              rclcpp::Duration::from_seconds(1.0 / output_rate_),
-                                             std::bind(&TwistMux::onOutputTimer, this));
+                                             std::bind(&VelocitySensorMux::onOutputTimer, this));
 
 
-        RCLCPP_INFO(get_logger(), "TwistMux ready: %zu inputs, output at %.1f Hz.",
+        RCLCPP_INFO(get_logger(), "VelocitySensorMux ready: %zu inputs, output at %.1f Hz.",
             inputs_.size(), output_rate_);
     }
 
@@ -499,7 +499,7 @@ private:
     double      output_rate_  = 50.0;
 };
 
-}  // namespace localization
+}  // namespace odometry
 }  // namespace hatchbed_common
 
-RCLCPP_COMPONENTS_REGISTER_NODE(hatchbed_common::localization::TwistMux)
+RCLCPP_COMPONENTS_REGISTER_NODE(hatchbed_common::odometry::VelocitySensorMux)

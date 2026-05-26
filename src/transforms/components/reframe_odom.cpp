@@ -32,7 +32,7 @@
 #include <string>
 
 #include <hatchbed_common/param_handler.h>
-#include <hatchbed_common/localization/covariance_util.h>
+#include <hatchbed_common/transforms/covariance_util.h>
 #include <nav_msgs/msg/odometry.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_components/register_node_macro.hpp>
@@ -40,7 +40,7 @@
 #include <tf2_ros/transform_listener.h>
 
 namespace hatchbed_common {
-namespace localization {
+namespace transforms {
 
 /**
  * Reframes an odometry topic to another fixed frame.  The transform is only
@@ -181,7 +181,7 @@ private:
     tf2::Transform transform_;
 };
 
-}  // namespace localization
+}  // namespace transforms
 }  // namespace hatchbed_common
 
-RCLCPP_COMPONENTS_REGISTER_NODE(hatchbed_common::localization::ReframeOdom)
+RCLCPP_COMPONENTS_REGISTER_NODE(hatchbed_common::transforms::ReframeOdom)

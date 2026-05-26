@@ -53,20 +53,16 @@ target_compile_features(hatchbed_common_logging INTERFACE cxx_std_17)
 add_library(hatchbed_common::logging ALIAS hatchbed_common_logging)
 
 # -----------------------------------------------------------------------------
-# Localization library
+# Transforms library
 # -----------------------------------------------------------------------------
-add_library(hatchbed_common_localization SHARED
-  src/localization/components/imu_to_twist.cpp
-  src/localization/components/odom_tf_broadcast.cpp
-  src/localization/components/odom_to_twist.cpp
-  src/localization/components/reframe_odom.cpp
-  src/localization/components/tf_reroot.cpp
-  src/localization/components/twist_mux.cpp
-  src/localization/covariance_util.cpp
-  src/localization/pose_buffer.cpp
+add_library(hatchbed_common_transforms SHARED
+  src/transforms/covariance_util.cpp
+  src/transforms/pose_buffer.cpp
+  src/transforms/components/reframe_odom.cpp
+  src/transforms/components/tf_reroot.cpp
 )
-set_target_properties(hatchbed_common_localization PROPERTIES EXPORT_NAME localization)
-target_link_libraries(hatchbed_common_localization PUBLIC
+set_target_properties(hatchbed_common_transforms PROPERTIES EXPORT_NAME transforms)
+target_link_libraries(hatchbed_common_transforms PUBLIC
   hatchbed_common
   Eigen3::Eigen
   ${geometry_msgs_TARGETS}
@@ -76,27 +72,51 @@ target_link_libraries(hatchbed_common_localization PUBLIC
   tf2::tf2
   ${tf2_msgs_TARGETS}
   tf2_ros::tf2_ros)
-target_include_directories(hatchbed_common_localization PUBLIC ${tf2_INCLUDE_DIRS})
-add_library(hatchbed_common::localization ALIAS hatchbed_common_localization)
+target_include_directories(hatchbed_common_transforms PUBLIC ${tf2_INCLUDE_DIRS})
+add_library(hatchbed_common::transforms ALIAS hatchbed_common_transforms)
 
-rclcpp_components_register_node(hatchbed_common_localization
-  PLUGIN "hatchbed_common::localization::ImuToTwist"
-  EXECUTABLE imu_to_twist)
-rclcpp_components_register_node(hatchbed_common_localization
-  PLUGIN "hatchbed_common::localization::OdomTfBroadcast"
-  EXECUTABLE odom_tf_broadcast)
-rclcpp_components_register_node(hatchbed_common_localization
-  PLUGIN "hatchbed_common::localization::OdomToTwist"
-  EXECUTABLE odom_to_twist)
-rclcpp_components_register_node(hatchbed_common_localization
-  PLUGIN "hatchbed_common::localization::ReframeOdom"
+rclcpp_components_register_node(hatchbed_common_transforms
+  PLUGIN "hatchbed_common::transforms::ReframeOdom"
   EXECUTABLE reframe_odom)
-rclcpp_components_register_node(hatchbed_common_localization
-  PLUGIN "hatchbed_common::localization::TfReroot"
+rclcpp_components_register_node(hatchbed_common_transforms
+  PLUGIN "hatchbed_common::transforms::TfReroot"
   EXECUTABLE tf_reroot)
-rclcpp_components_register_node(hatchbed_common_localization
-  PLUGIN "hatchbed_common::localization::TwistMux"
-  EXECUTABLE twist_mux)
+
+# -----------------------------------------------------------------------------
+# Odometry library
+# -----------------------------------------------------------------------------
+add_library(hatchbed_common_odometry SHARED
+  src/odometry/components/imu_to_twist.cpp
+  src/odometry/components/odom_tf_broadcast.cpp
+  src/odometry/components/odom_to_twist.cpp
+  src/odometry/components/velocity_sensor_mux.cpp
+)
+set_target_properties(hatchbed_common_odometry PROPERTIES EXPORT_NAME odometry)
+target_link_libraries(hatchbed_common_odometry PUBLIC
+  hatchbed_common
+  Eigen3::Eigen
+  ${geometry_msgs_TARGETS}
+  ${nav_msgs_TARGETS}
+  ${rclcpp_components_TARGETS}
+  ${sensor_msgs_TARGETS}
+  tf2::tf2
+  ${tf2_msgs_TARGETS}
+  tf2_ros::tf2_ros)
+target_include_directories(hatchbed_common_odometry PUBLIC ${tf2_INCLUDE_DIRS})
+add_library(hatchbed_common::odometry ALIAS hatchbed_common_odometry)
+
+rclcpp_components_register_node(hatchbed_common_odometry
+  PLUGIN "hatchbed_common::odometry::ImuToTwist"
+  EXECUTABLE imu_to_twist)
+rclcpp_components_register_node(hatchbed_common_odometry
+  PLUGIN "hatchbed_common::odometry::OdomTfBroadcast"
+  EXECUTABLE odom_tf_broadcast)
+rclcpp_components_register_node(hatchbed_common_odometry
+  PLUGIN "hatchbed_common::odometry::OdomToTwist"
+  EXECUTABLE odom_to_twist)
+rclcpp_components_register_node(hatchbed_common_odometry
+  PLUGIN "hatchbed_common::odometry::VelocitySensorMux"
+  EXECUTABLE velocity_sensor_mux)
 
 # -----------------------------------------------------------------------------
 # Pointcloud library
@@ -144,7 +164,8 @@ target_link_libraries(example_node PRIVATE hatchbed_common)
 install(TARGETS
   hatchbed_common
   hatchbed_common_logging
-  hatchbed_common_localization
+  hatchbed_common_transforms
+  hatchbed_common_odometry
   hatchbed_common_pointcloud
   EXPORT hatchbed_commonTargets
   ARCHIVE DESTINATION lib
@@ -157,7 +178,7 @@ install(TARGETS
   odom_to_twist
   reframe_odom
   tf_reroot
-  twist_mux
+  velocity_sensor_mux
   crop_box_node
   crop_radius_node
   merge_point_clouds
@@ -203,11 +224,14 @@ if(BUILD_TESTING)
   ament_add_gtest(test_ros_names test/test_ros_names.cpp)
   target_link_libraries(test_ros_names hatchbed_common)
 
-  ament_add_gtest(test_covariance_util test/localization/test_covariance_util.cpp)
-  target_link_libraries(test_covariance_util hatchbed_common_localization)
+  ament_add_gtest(test_covariance_util test/transforms/test_covariance_util.cpp)
+  target_link_libraries(test_covariance_util hatchbed_common_transforms)
 
-  ament_add_gtest(test_pose_buffer test/localization/test_pose_buffer.cpp)
-  target_link_libraries(test_pose_buffer hatchbed_common_localization)
+  ament_add_gtest(test_pose_buffer test/transforms/test_pose_buffer.cpp)
+  target_link_libraries(test_pose_buffer hatchbed_common_transforms)
+
+  ament_add_gtest(test_transform_util test/transforms/test_transform_util.cpp)
+  target_link_libraries(test_transform_util hatchbed_common_transforms)
 
   ament_add_gtest(test_point_cloud2_util test/pointcloud/test_point_cloud2_util.cpp)
   target_link_libraries(test_point_cloud2_util hatchbed_common_pointcloud)

@@ -36,7 +36,7 @@
 #include <rclcpp/time.hpp>
 
 namespace hatchbed_common {
-namespace localization {
+namespace transforms {
 
 // Bounded, time-ordered history of poses with SLERP/LERP interpolation.
 //
@@ -79,5 +79,5 @@ private:
     std::deque<Entry> buffer_;
 };
 
-}  // namespace localization
+}  // namespace transforms
 }  // namespace hatchbed_common
