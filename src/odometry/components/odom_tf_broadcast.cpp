@@ -43,7 +43,7 @@
 #include <tf2_ros/transform_listener.h>
 
 namespace hatchbed_common {
-namespace localization {
+namespace odometry {
 
 /**
  * Broadcasts a TF transform derived from an odometry message to establish
@@ -221,7 +221,7 @@ private:
     double      timestamp_offset_ = 0.0;
 };
 
-}  // namespace localization
+}  // namespace odometry
 }  // namespace hatchbed_common
 
-RCLCPP_COMPONENTS_REGISTER_NODE(hatchbed_common::localization::OdomTfBroadcast)
+RCLCPP_COMPONENTS_REGISTER_NODE(hatchbed_common::odometry::OdomTfBroadcast)

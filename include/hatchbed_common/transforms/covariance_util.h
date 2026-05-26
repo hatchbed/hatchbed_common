@@ -26,32 +26,25 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-#include <hatchbed_common/localization/covariance_util.h>
+#pragma once
 
-#include <Eigen/Geometry>
+#include <array>
+
+#include <tf2/LinearMath/Quaternion.hpp>
 
 namespace hatchbed_common {
-namespace localization {
+namespace transforms {
 
 using Covariance = std::array<double, 36>;
 
-Covariance rotateCovariance(
-    const Covariance& cov_in,
-    const tf2::Quaternion& q)
-{
-    Eigen::Matrix3d R = Eigen::Quaterniond(q.w(), q.x(), q.y(), q.z()).toRotationMatrix();
-    Eigen::Map<const Eigen::Matrix<double, 6, 6, Eigen::RowMajor>> C(cov_in.data());
+/**
+ * Rotates a 6x6 covariance matrix by a rotation, applying it to both the
+ * translational and rotational components.
+ *
+ * C_out = J * C_in * J^T,
+ * where J = diag(R, R) (block diagonal with rotation matrix R)
+ */
+Covariance rotateCovariance(const Covariance& cov_in, const tf2::Quaternion& q);
 
-    Eigen::Matrix<double, 6, 6, Eigen::RowMajor> result;
-    result.block<3, 3>(0, 0) = R * C.block<3, 3>(0, 0) * R.transpose();  // pos-pos
-    result.block<3, 3>(0, 3) = R * C.block<3, 3>(0, 3) * R.transpose();  // pos-rot
-    result.block<3, 3>(3, 0) = R * C.block<3, 3>(3, 0) * R.transpose();  // rot-pos
-    result.block<3, 3>(3, 3) = R * C.block<3, 3>(3, 3) * R.transpose();  // rot-rot
-
-    Covariance cov_out;
-    Eigen::Map<Eigen::Matrix<double, 6, 6, Eigen::RowMajor>>(cov_out.data()) = result;
-    return cov_out;
-}
-
-}  // namespace localization
+}  // namespace transforms
 }  // namespace hatchbed_common

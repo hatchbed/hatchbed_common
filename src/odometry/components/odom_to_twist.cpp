@@ -34,36 +34,38 @@
 
 #include <geometry_msgs/msg/twist_with_covariance_stamped.hpp>
 #include <hatchbed_common/param_handler.h>
+#include <nav_msgs/msg/odometry.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_components/register_node_macro.hpp>
-#include <sensor_msgs/msg/imu.hpp>
 #include <tf2/LinearMath/Quaternion.hpp>
+#include <tf2/LinearMath/Transform.hpp>
 
 namespace hatchbed_common {
-namespace localization {
+namespace odometry {
 
 /**
- * Converts a sensor_msgs/Imu message to geometry_msgs/TwistWithCovarianceStamped.
+ * Extracts the twist from a nav_msgs/Odometry message and republishes it as
+ * geometry_msgs/TwistWithCovarianceStamped.
  *
  * Direct mode (differential: false):
- *   Copies angular_velocity and its diagonal covariance from the IMU message.
- *   Linear velocity is zero (IMUs do not provide it).
+ *   Copies the twist field verbatim.  An optional frame_id override replaces
+ *   the header frame if non-empty.
  *
  * Differential mode (differential: true):
- *   Derives angular velocity by differentiating consecutive orientation quaternions.
- *   Given dq = q_prev_inv * q_curr = (cos(a/2), sin(a/2)*axis), the body-frame
- *   angular velocity is w = (a / dt) * axis.
- *   Covariance is propagated from orientation_covariance: C_w = 2 * C_theta / dt^2.
- *   Requires the orientation field to be populated (orientation_covariance[0] >= 0).
+ *   Derives the body-frame twist by finite-differencing consecutive poses:
+ *     dT = T_prev_inv * T_curr  (relative transform in the child frame)
+ *     linear  = dT.translation / dt
+ *     angular = (angle / dt) * axis  from dT's rotation quaternion
+ *   Covariance is propagated from pose.covariance: C_twist = 2 * C_pose / dt^2.
  */
-class ImuToTwist : public rclcpp::Node {
+class OdomToTwist : public rclcpp::Node {
 public:
-    explicit ImuToTwist(const rclcpp::NodeOptions& options)
-    : Node("imu_to_twist", options)
+    explicit OdomToTwist(const rclcpp::NodeOptions& options)
+    : Node("odom_to_twist", options)
     {
         init_timer_ = create_wall_timer(
             std::chrono::milliseconds(100),
-            std::bind(&ImuToTwist::onInit, this));
+            std::bind(&OdomToTwist::onInit, this));
     }
 
 private:
@@ -73,41 +75,37 @@ private:
         params_ = std::make_shared<hatchbed_common::ParamHandler>(shared_from_this());
         params_->register_verbose_logging_param();
 
+        params_->param(&frame_id_, "frame_id", std::string(""),
+            "Override the output header frame_id.  If empty, the odometry header "
+            "frame_id is used unchanged.").declare();
+
         params_->param(&differential_, "differential", false,
-            "Derive angular velocity from the differential of the orientation rather "
-            "than reading angular_velocity directly.  Requires the orientation field "
-            "to be populated.").declare();
+            "Derive twist from the differential of the pose rather than reading the "
+            "twist field directly.").declare();
 
         pub_twist_ = create_publisher<geometry_msgs::msg::TwistWithCovarianceStamped>(
             "twist", rclcpp::QoS(10));
 
-        sub_imu_ = create_subscription<sensor_msgs::msg::Imu>(
-            "imu", rclcpp::QoS(10),
-            std::bind(&ImuToTwist::onImu, this, std::placeholders::_1));
+        sub_odom_ = create_subscription<nav_msgs::msg::Odometry>(
+            "odom", rclcpp::QoS(10),
+            std::bind(&OdomToTwist::onOdom, this, std::placeholders::_1));
 
-        RCLCPP_INFO(get_logger(), "Converting IMU to twist (%s mode).",
+        RCLCPP_INFO(get_logger(), "Converting odometry to twist (%s mode).",
             differential_ ? "differential" : "direct");
     }
 
-    void onImu(const sensor_msgs::msg::Imu::SharedPtr msg) {
+    void onOdom(const nav_msgs::msg::Odometry::SharedPtr msg) {
         geometry_msgs::msg::TwistWithCovarianceStamped twist;
         twist.header = msg->header;
+        if (!frame_id_.empty()) {
+            twist.header.frame_id = frame_id_;
+        }
 
         if (differential_) {
-            if (msg->orientation_covariance[0] < 0.0) {
-                RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
-                    "differential mode requires orientation to be populated "
-                    "(orientation_covariance[0] < 0 indicates it is not); "
-                    "dropping message.");
-                return;
-            }
-
-            tf2::Quaternion q_curr(
-                msg->orientation.x, msg->orientation.y,
-                msg->orientation.z, msg->orientation.w);
+            const tf2::Transform T_curr = poseToTransform(msg->pose.pose);
 
             if (!has_prev_) {
-                prev_q_     = q_curr;
+                prev_T_     = T_curr;
                 prev_stamp_ = msg->header.stamp;
                 has_prev_   = true;
                 return;
@@ -117,23 +115,29 @@ private:
                 (rclcpp::Time(msg->header.stamp) - rclcpp::Time(prev_stamp_)).seconds();
 
             // Advance state before any early returns so we never stall.
-            const tf2::Quaternion q_prev = prev_q_;
-            prev_q_     = q_curr;
+            const tf2::Transform T_prev = prev_T_;
+            prev_T_     = T_curr;
             prev_stamp_ = msg->header.stamp;
 
             if (dt <= 0.0) {
                 return;
             }
 
-            // dq = q_prev_inv * q_curr: body-frame rotation over dt.
-            // Ensure shortest-path (w >= 0) before extracting angle.
-            tf2::Quaternion dq = q_prev.inverse() * q_curr;
+            // dT = T_prev_inv * T_curr: relative motion in the child (body) frame.
+            const tf2::Transform dT = T_prev.inverse() * T_curr;
+
+            const tf2::Vector3 lin = dT.getOrigin() / dt;
+            twist.twist.twist.linear.x = lin.x();
+            twist.twist.twist.linear.y = lin.y();
+            twist.twist.twist.linear.z = lin.z();
+
+            // dq = (cos(a/2), sin(a/2)*axis)  =>  w = (a/dt) * axis
+            tf2::Quaternion dq = dT.getRotation();
             dq.normalize();
             if (dq.w() < 0.0) {
                 dq = tf2::Quaternion(-dq.x(), -dq.y(), -dq.z(), -dq.w());
             }
 
-            // dq = (cos(a/2), sin(a/2)*axis)  =>  w = (a/dt) * axis
             const double vec_norm = std::sqrt(
                 dq.x() * dq.x() + dq.y() * dq.y() + dq.z() * dq.z());
             const double angle = 2.0 * std::atan2(vec_norm, dq.w());
@@ -145,37 +149,46 @@ private:
                 twist.twist.twist.angular.z = scale * dq.z();
             }
 
-            // Independent-sample finite-difference covariance: C_w = 2 * C_theta / dt^2
+            // Independent-sample finite-difference covariance: C_twist = 2 * C_pose / dt^2
             const double inv_dt2 = 1.0 / (dt * dt);
-            twist.twist.covariance[21] = 2.0 * msg->orientation_covariance[0] * inv_dt2;
-            twist.twist.covariance[28] = 2.0 * msg->orientation_covariance[4] * inv_dt2;
-            twist.twist.covariance[35] = 2.0 * msg->orientation_covariance[8] * inv_dt2;
+            for (int i = 0; i < 6; ++i) {
+                for (int j = 0; j < 6; ++j) {
+                    twist.twist.covariance[i * 6 + j] =
+                        2.0 * msg->pose.covariance[i * 6 + j] * inv_dt2;
+                }
+            }
 
         } else {
-            twist.twist.twist.angular    = msg->angular_velocity;
-            twist.twist.covariance[21]   = msg->angular_velocity_covariance[0];
-            twist.twist.covariance[28]   = msg->angular_velocity_covariance[4];
-            twist.twist.covariance[35]   = msg->angular_velocity_covariance[8];
+            twist.twist = msg->twist;
         }
 
         pub_twist_->publish(twist);
     }
 
+    static tf2::Transform poseToTransform(const geometry_msgs::msg::Pose& pose) {
+        return tf2::Transform(
+            tf2::Quaternion(
+                pose.orientation.x, pose.orientation.y,
+                pose.orientation.z, pose.orientation.w),
+            tf2::Vector3(pose.position.x, pose.position.y, pose.position.z));
+    }
+
     rclcpp::TimerBase::SharedPtr                   init_timer_;
     std::shared_ptr<hatchbed_common::ParamHandler> params_;
 
-    rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr                       sub_imu_;
+    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr                     sub_odom_;
     rclcpp::Publisher<geometry_msgs::msg::TwistWithCovarianceStamped>::SharedPtr pub_twist_;
 
-    bool            differential_ = false;
+    std::string    frame_id_;
+    bool           differential_ = false;
 
     // Differential mode state.
-    tf2::Quaternion prev_q_;
-    rclcpp::Time    prev_stamp_;
-    bool            has_prev_ = false;
+    tf2::Transform prev_T_;
+    rclcpp::Time   prev_stamp_;
+    bool           has_prev_ = false;
 };
 
-}  // namespace localization
+}  // namespace odometry
 }  // namespace hatchbed_common
 
-RCLCPP_COMPONENTS_REGISTER_NODE(hatchbed_common::localization::ImuToTwist)
+RCLCPP_COMPONENTS_REGISTER_NODE(hatchbed_common::odometry::OdomToTwist)

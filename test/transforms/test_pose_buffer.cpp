@@ -27,11 +27,11 @@
 // POSSIBILITY OF SUCH DAMAGE.
 
 #include <gtest/gtest.h>
-#include <hatchbed_common/localization/pose_buffer.h>
+#include <hatchbed_common/transforms/pose_buffer.h>
 
 #include <cmath>
 
-using hatchbed_common::localization::PoseBuffer;
+using hatchbed_common::transforms::PoseBuffer;
 
 // Construct a rclcpp::Time from a floating-point number of seconds.
 static rclcpp::Time ts(double seconds) {

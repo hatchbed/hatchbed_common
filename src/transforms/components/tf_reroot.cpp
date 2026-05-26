@@ -45,7 +45,7 @@
 #include <tf2_ros/transform_listener.h>
 
 namespace hatchbed_common {
-namespace localization {
+namespace transforms {
 
 /**
  * Bridges two otherwise disconnected TF trees to broadcast parent_frame ->
@@ -285,7 +285,7 @@ private:
     bool        parent_in_main_;    // set by detectPivot
 };
 
-}  // namespace localization
+}  // namespace transforms
 }  // namespace hatchbed_common
 
-RCLCPP_COMPONENTS_REGISTER_NODE(hatchbed_common::localization::TfReroot)
+RCLCPP_COMPONENTS_REGISTER_NODE(hatchbed_common::transforms::TfReroot)
