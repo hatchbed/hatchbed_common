@@ -15,6 +15,15 @@ Forthcoming
   rigid-body transform; ``padConvexPrism()`` expands the XY footprint by a margin;
   ``cropToConvexPrism()`` filters a point cloud to the prism interior.
 * Add ``hasXYZFloat()`` convenience helper to ``pointcloud/point_cloud2_util.hpp``.
+* Restructure ``hatchbed_common_localization`` into two focused sub-libraries:
+  * ``hatchbed_common::transforms`` (``transforms/transform_util.h``,
+    ``transforms/covariance_util.h``, ``transforms/pose_buffer.h``) -- frame geometry,
+    covariance rotation, pose interpolation, ``tf_reroot`` and ``reframe_odom`` nodes.
+    ``toIsometry(TransformStamped)`` is the canonical SE(3) conversion helper.
+  * ``hatchbed_common::odometry`` -- odometry signal conversion and velocity muxing nodes:
+    ``imu_to_twist``, ``odom_to_twist``, ``odom_tf_broadcast``, ``velocity_sensor_mux``
+    (formerly ``twist_mux``).
+
 * Contributors: Marc Alban
 
 0.1.7 (2026-05-01)
