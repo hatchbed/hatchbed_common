@@ -403,7 +403,7 @@ class NumericParameter : public Parameter<T> {
         return true;
     }
 
-    virtual bool update(const T& value, bool from_callback = false) {
+    bool update(const T& value, bool from_callback = false) override {
         if (!checkRange(value)) {
             return false;
         }
@@ -537,7 +537,7 @@ class NumericIntParameter : public NumericParameter<T> {
     }
 
     protected:
-    virtual bool update(const T& value, bool from_callback = false) {
+    bool update(const T& value, bool from_callback = false) override {
         if (!enums_.empty() && !checkEnum(value)) {
             return false;
         }
