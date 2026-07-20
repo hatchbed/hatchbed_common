@@ -38,9 +38,11 @@
 #include <rclcpp_components/register_node_macro.hpp>
 #include <tf2/LinearMath/Quaternion.hpp>
 #include <tf2/LinearMath/Transform.hpp>
-#include <tf2_ros/buffer.h>
-#include <tf2_ros/transform_broadcaster.h>
-#include <tf2_ros/transform_listener.h>
+#include <tf2_ros/buffer.hpp>
+#include <tf2_ros/transform_broadcaster.hpp>
+#include <tf2_ros/transform_listener.hpp>
+
+#include <hatchbed_common/tf2_ros_compat.h>
 
 namespace hatchbed_common {
 namespace odometry {
@@ -104,8 +106,8 @@ private:
         }
 
         tf_buffer_      = std::make_shared<tf2_ros::Buffer>(get_clock());
-        tf_listener_    = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_, this);
-        tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(this);
+        tf_listener_    = makeTransformListener(*tf_buffer_, this);
+        tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
 
         sub_odom_ = create_subscription<nav_msgs::msg::Odometry>(
             "odom", rclcpp::QoS(10),
