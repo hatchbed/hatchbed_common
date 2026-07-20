@@ -37,8 +37,8 @@
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_components/register_node_macro.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
-#include <tf2_ros/buffer.h>
-#include <tf2_ros/transform_listener.h>
+#include <tf2_ros/buffer.hpp>
+#include <tf2_ros/transform_listener.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
 
 namespace hatchbed_common {
