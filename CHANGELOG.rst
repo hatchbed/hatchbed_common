@@ -23,7 +23,7 @@ Forthcoming
   * ``hatchbed_common::odometry`` -- odometry signal conversion and velocity muxing nodes:
     ``imu_to_twist``, ``odom_to_twist``, ``odom_tf_broadcast``, ``velocity_sensor_mux``
     (formerly ``twist_mux``).
-
+* Fix build against the newer ``tf2_ros`` API.
 * Contributors: Marc Alban
 
 0.1.7 (2026-05-01)
