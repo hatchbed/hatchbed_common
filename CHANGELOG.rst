@@ -2,8 +2,8 @@
 Changelog for package hatchbed_common
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+0.1.8 (2026-07-21)
+------------------
 * Add explicit-source-location logging free functions (``logging/functions.h``): ``log_at``,
   ``debug``, ``info``, ``warn``, ``error``, ``fatal`` — each accepting ``(logger, file, func,
   line, message)`` with both ``std::string`` and ``fmt::format_string`` overloads, plus
