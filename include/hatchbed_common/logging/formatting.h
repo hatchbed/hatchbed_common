@@ -52,9 +52,9 @@
 // Math & Geometry
 #include <Eigen/Core>
 #include <Eigen/Geometry>
-#include <tf2/LinearMath/Vector3.h>
-#include <tf2/LinearMath/Quaternion.h>
-#include <tf2/LinearMath/Transform.h>
+#include <tf2/LinearMath/Vector3.hpp>
+#include <tf2/LinearMath/Quaternion.hpp>
+#include <tf2/LinearMath/Transform.hpp>
 
 // Workaround for a bug in fmt 8.1.1 (ROS 2 Humble) where types with implicit pointer
 // conversions trigger a static_assert even when a valid formatter exists.
