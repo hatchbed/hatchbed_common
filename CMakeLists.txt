@@ -91,6 +91,7 @@ rclcpp_components_register_node(hatchbed_common_transforms
 # -----------------------------------------------------------------------------
 add_library(hatchbed_common_odometry SHARED
   src/odometry/components/imu_to_twist.cpp
+  src/odometry/components/joint_states_to_twist.cpp
   src/odometry/components/odom_tf_broadcast.cpp
   src/odometry/components/odom_to_twist.cpp
   src/odometry/components/velocity_sensor_mux.cpp
@@ -112,6 +113,9 @@ add_library(hatchbed_common::odometry ALIAS hatchbed_common_odometry)
 rclcpp_components_register_node(hatchbed_common_odometry
   PLUGIN "hatchbed_common::odometry::ImuToTwist"
   EXECUTABLE imu_to_twist)
+rclcpp_components_register_node(hatchbed_common_odometry
+  PLUGIN "hatchbed_common::odometry::JointStatesToTwist"
+  EXECUTABLE joint_states_to_twist)
 rclcpp_components_register_node(hatchbed_common_odometry
   PLUGIN "hatchbed_common::odometry::OdomTfBroadcast"
   EXECUTABLE odom_tf_broadcast)
@@ -189,6 +193,7 @@ install(TARGETS
 
 install(TARGETS
   imu_to_twist
+  joint_states_to_twist
   odom_tf_broadcast
   odom_to_twist
   reframe_odom

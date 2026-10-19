@@ -16,7 +16,7 @@ target_link_libraries(my_target hatchbed_common::odometry)
 
 ## Composable nodes
 
-The `hatchbed_common_odometry` library registers four composable nodes for use in
+The `hatchbed_common_odometry` library registers five composable nodes for use in
 launch files.  Each can also be run as a standalone executable.
 
 ### ImuToTwist
@@ -35,6 +35,44 @@ In direct mode the `angular_velocity` field and its diagonal covariance are copi
 In differential mode the angular velocity is computed from consecutive quaternion deltas and
 covariance is propagated as `C_w = 2 * C_theta / dt^2`.  Requires the IMU's
 `orientation_covariance[0] >= 0`.
+
+---
+
+### JointStatesToTwist
+
+Derives a body-frame `geometry_msgs/TwistWithCovarianceStamped` from the wheel (and
+steering) joints of a `sensor_msgs/JointState`.  Only forward velocity (`lx`) and yaw rate
+(`az`) are observed; lateral velocity (`ly`) is reported as 0 with `lateral_variance`, and the
+remaining axes are set to `unmeasured_variance` so a downstream fuser (e.g.
+`VelocitySensorMux`) discounts them.
+
+- **Executable:** `joint_states_to_twist`
+- **Topics:** `joint_states` (input) -> `twist` (output)
+- **Key parameters:**
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `frame_id` | string | `base_link` | Frame ID for the output twist header |
+| `model` | string | `differential` | `differential` (yaw from the left/right wheel-speed difference) or `ackermann` (yaw from the steering angle via the bicycle model) |
+| `left_wheel_joint` | string | `""` | Left drive-wheel joint (a driven rear wheel for ackermann); velocity read from the JointState (required) |
+| `right_wheel_joint` | string | `""` | Right drive-wheel joint (a driven rear wheel for ackermann); velocity read from the JointState (required) |
+| `steering_joint` | string | `""` | Steering joint (ackermann only); position read as the effective road-wheel steer angle in radians |
+| `wheel_radius` | double | `0.1` | Drive-wheel radius (m); converts wheel velocity (rad/s) to linear velocity (m/s) |
+| `track` | double | `1.0` | Lateral left-right wheel separation (m); used for the differential yaw rate |
+| `wheelbase` | double | `1.0` | Longitudinal front-rear axle separation (m); used for the ackermann yaw rate |
+| `linear_variance` | double | `1e-3` | Variance assigned to the linear-x estimate (dynamic) |
+| `angular_variance` | double | `1e-3` | Variance assigned to the angular-z estimate (dynamic) |
+| `slip_variance_gain` | double | `0.0` | Inflates the linear-x variance in turns to model wheel slip: it becomes `linear_variance + (slip_variance_gain * yaw_rate)^2`, in metres; 0 disables (dynamic) |
+| `lateral_variance` | double | `1e9` | Variance assigned to the linear-y estimate (always 0). Large treats `vy` as unobserved; small asserts the non-holonomic no-lateral-slip constraint (dynamic) |
+| `unmeasured_variance` | double | `1e9` | Variance assigned to the unobserved axes (`lz`, `ax`, `ay`) |
+
+Forward velocity is `wheel_radius * (w_left + w_right) / 2` for both models.  The differential
+yaw is `wheel_radius * (w_right - w_left) / track`; the ackermann yaw is
+`v * tan(steering_angle) / wheelbase`.  Wheel joints are assumed to follow the ROS convention
+that a positive joint velocity is forward and that the left/right wheels share a spin axis.
+The twist is reported at the wheel-odometry reference point (axle midpoint for differential,
+rear axle for ackermann); mount the output frame there or account for the lever arm
+downstream.
 
 ---
 
