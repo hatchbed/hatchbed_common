@@ -39,6 +39,17 @@ namespace pointcloud {
 // Returns vertices in counter-clockwise order. Input is consumed (passed by value).
 std::vector<Eigen::Vector2f> convexHull2D(std::vector<Eigen::Vector2f> pts);
 
+// Whether p lies inside (or exactly on the boundary of) a CCW convex hull.
+//
+// The same test distToConvexPolygon2D makes to decide "inside", without the distance: it
+// stops at the first edge p is outside of and never takes a square root. Containment is all
+// a crop needs, and this is the inner loop of one.
+//
+// A hull of fewer than three vertices has no interior, so nothing is inside it.
+bool insideConvexPolygon2D(
+    const Eigen::Vector2f& p,
+    const std::vector<Eigen::Vector2f>& hull);
+
 // Distance from p to the nearest point on the boundary of a CCW convex polygon.
 // Returns 0.0 if p is inside or on the polygon.
 float distToConvexPolygon2D(

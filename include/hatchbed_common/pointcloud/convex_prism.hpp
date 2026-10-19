@@ -73,6 +73,10 @@ ConvexPrism makeConvexPrism(const ContainerT& points) {
     return {convexHull2D(std::move(xy_pts)), min_z, max_z};
 }
 
+// Build a ConvexPrism from Eigen vertices. The template above wants .x/.y/.z as members,
+// which Eigen exposes as methods, so vertices carried as Eigen::Vector3f need this.
+ConvexPrism makeConvexPrism(const std::vector<Eigen::Vector3f>& points);
+
 // Build a ConvexPrism from a PointCloud2 by projecting XYZ onto the XY plane,
 // computing the 2D convex hull, and recording the full Z extent. The cloud must
 // have x, y, z fields of type FLOAT32. NaN/Inf points are ignored. Returns an
@@ -86,8 +90,67 @@ ConvexPrism makeConvexPrism(const sensor_msgs::msg::PointCloud2& cloud);
 // the Minkowski sum at sharp corners (corners are extended rather than rounded).
 ConvexPrism padConvexPrism(const ConvexPrism& prism, float padding);
 
-// Return a new ConvexPrism with hull vertices and Z bounds transformed by pose.
+// Return a new ConvexPrism holding the volume of prism transformed by pose.
+//
+// A prism is a footprint extruded along Z, so a pose that leaves the Z axis alone -- any
+// translation, any rotation about Z -- maps it to another prism exactly, and that is the
+// path taken when pose does so.
+//
+// Any other pose tilts the volume, and a tilted prism is not a prism: no footprint extruded
+// along Z is equal to it. What comes back is then the smallest prism that CONTAINS the
+// tilted volume, built by transforming all of the original's corners and re-hulling them.
+// That never loses part of the volume, which matters when a prism is being used to decide
+// what to remove, but it can be a good deal larger than the volume it stands for -- the
+// worse the more of a prism's height is empty. A caller that still has the vertices the
+// prism was built from should rebuild from those instead: the prism already over-covers
+// whatever it was built from, and tilting an over-approximation compounds it. A diagonal
+// strut through a 1 x 1 x 3 m envelope prisms to that whole block; tilt the block 45 degrees
+// and it becomes 2.8 m across, where re-hulling the strut's own vertices gives a sliver.
 ConvexPrism transformConvexPrism(const ConvexPrism& prism, const Eigen::Isometry3f& pose);
+
+// The prism's footprint bounds, for a cheap reject before the polygon test. Empty prisms
+// give an inverted (max < min) box, which no point is inside.
+struct PrismBounds {
+    Eigen::Vector2f min_xy = Eigen::Vector2f::Zero();
+    Eigen::Vector2f max_xy = Eigen::Vector2f::Zero();
+    float min_z = 1.0f;
+    float max_z = 0.0f;
+
+    bool contains(const Eigen::Vector3f& point) const {
+        return point.z() >= min_z && point.z() <= max_z &&
+               point.x() >= min_xy.x() && point.x() <= max_xy.x() &&
+               point.y() >= min_xy.y() && point.y() <= max_xy.y();
+    }
+};
+
+PrismBounds boundsOfConvexPrism(const ConvexPrism& prism);
+
+// Whether a point lies within prism, expanded by tolerance. Both must be in the same frame.
+bool insideConvexPrism(const Eigen::Vector3f& point, const ConvexPrism& prism,
+                        float tolerance = 0.0f);
+
+// Copy points from cloud to output, dropping every point inside any of prisms and keeping
+// the rest, compacted. All original fields are preserved and the header is untouched, so
+// the output stays in the input's frame. The cloud and the prisms must be expressed in the
+// same frame, EXCEPT that cloud_to_prism_frame is applied to each point first -- which is
+// what lets a cloud be tested against prisms held in a body frame without transforming and
+// transforming back, since the point copied out is the original and not the transformed one.
+//
+// The cloud must have x, y, z fields of type FLOAT32. Points that are not finite are
+// dropped: they are not evidence of anything, and no consumer of a compacted cloud wants
+// them.
+//
+// removed, when given, receives exactly the points output did not, in the same form. It
+// costs a second buffer and nothing else -- the decision has already been made either way --
+// so it is worth asking for whenever somebody is looking at what the filter is eating.
+//
+// Returns the number of points removed, so a caller can report it.
+size_t removeConvexPrisms(const sensor_msgs::msg::PointCloud2& cloud,
+                           const std::vector<ConvexPrism>& prisms,
+                           const std::vector<PrismBounds>& bounds,
+                           const Eigen::Isometry3f& cloud_to_prism_frame,
+                           sensor_msgs::msg::PointCloud2& output,
+                           sensor_msgs::msg::PointCloud2* removed = nullptr);
 
 // Copy points from cloud to output, keeping only those whose distance to the
 // surface of prism is at most tolerance. All original fields are preserved.

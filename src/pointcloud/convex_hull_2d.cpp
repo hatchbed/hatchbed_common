@@ -67,6 +67,22 @@ std::vector<Eigen::Vector2f> convexHull2D(std::vector<Eigen::Vector2f> pts) {
     return hull;
 }
 
+bool insideConvexPolygon2D(
+    const Eigen::Vector2f& p,
+    const std::vector<Eigen::Vector2f>& hull)
+{
+    const int n = static_cast<int>(hull.size());
+    if (n < 3) return false;
+    for (int i = 0; i < n; i++) {
+        const Eigen::Vector2f& a = hull[i];
+        const Eigen::Vector2f& b = hull[(i + 1) % n];
+        const Eigen::Vector2f ab = b - a;
+        const Eigen::Vector2f ap = p - a;
+        if (ab.x() * ap.y() - ab.y() * ap.x() < 0.0f) return false;
+    }
+    return true;
+}
+
 float distToConvexPolygon2D(
     const Eigen::Vector2f& p,
     const std::vector<Eigen::Vector2f>& hull)

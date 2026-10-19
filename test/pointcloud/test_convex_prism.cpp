@@ -41,6 +41,7 @@
 using hatchbed_common::pointcloud::ConvexPrism;
 using hatchbed_common::pointcloud::makeConvexPrism;
 using hatchbed_common::pointcloud::padConvexPrism;
+using hatchbed_common::pointcloud::insideConvexPrism;
 using hatchbed_common::pointcloud::transformConvexPrism;
 using hatchbed_common::pointcloud::cropToConvexPrism;
 using hatchbed_common::pointcloud::cropConvexPrism;
@@ -226,6 +227,69 @@ TEST(PadConvexPrism, EmptyHull) {
     });
 }
 
+// The case that got past this in the field: a hull over tens of thousands of mesh vertices,
+// whose footprint is a thin strip because the structure it came from is near vertical. It has
+// vertices millimetres apart and edges shorter than the noise that placed them, and mitring
+// two nearly-parallel offset edges from those flings a vertex far enough to leave the ring
+// self-intersecting -- at which point a containment test rejects the polygon's own interior
+// and the filter quietly stops filtering.
+TEST(PadConvexPrism, StaysAPolygonForAHullWithNearDuplicateVertices) {
+    ConvexPrism prism;
+    prism.min_z = 0.5f;
+    prism.max_z = 9.3f;
+    // A 3 x 1.6 m strip sampled every few millimetres along its long sides, in hull order.
+    for (float x = 1.3f; x <= 4.3f; x += 0.004f) {
+        prism.hull.emplace_back(x, -0.8f - 0.0005f * std::sin(x * 40.0f));
+    }
+    for (float x = 4.3f; x >= 1.3f; x -= 0.004f) {
+        prism.hull.emplace_back(x, 0.8f + 0.0005f * std::sin(x * 40.0f));
+    }
+    // And a duplicate, which a hull over float vertices does produce.
+    prism.hull.push_back(prism.hull.back());
+
+    const ConvexPrism padded = padConvexPrism(prism, 0.05f);
+    ASSERT_GE(padded.hull.size(), 3u);
+
+    // Wound the way it came in, and convex: every turn the same way round.
+    double area = 0.0;
+    size_t left = 0;
+    size_t right = 0;
+    const size_t n = padded.hull.size();
+    for (size_t i = 0; i < n; ++i) {
+        const Eigen::Vector2f& a = padded.hull[i];
+        const Eigen::Vector2f& b = padded.hull[(i + 1) % n];
+        const Eigen::Vector2f& c = padded.hull[(i + 2) % n];
+        area += static_cast<double>(a.x()) * b.y() - static_cast<double>(b.x()) * a.y();
+        const float turn = (b - a).x() * (c - b).y() - (b - a).y() * (c - b).x();
+        if (turn > 0.0f) {
+            ++left;
+        } else if (turn < 0.0f) {
+            ++right;
+        }
+    }
+    EXPECT_GT(area, 0.0) << "the padded ring is not counter-clockwise";
+    EXPECT_TRUE(left == 0 || right == 0) << "the padded ring is self-intersecting: " << left
+                                         << " left turns and " << right << " right";
+
+    // And it holds what it is supposed to: its own middle, and everything the unpadded strip
+    // held, and the padding beyond that.
+    EXPECT_TRUE(insideConvexPrism({2.8f, 0.0f, 5.0f}, padded));
+    EXPECT_TRUE(insideConvexPrism({1.3f, -0.79f, 5.0f}, padded));
+    EXPECT_TRUE(insideConvexPrism({2.8f, 0.83f, 5.0f}, padded));   // inside the padding
+    EXPECT_FALSE(insideConvexPrism({2.8f, 1.2f, 5.0f}, padded));   // well outside it
+}
+
+TEST(PadConvexPrism, ADegenerateHullStillCoversItsOwnPadding) {
+    ConvexPrism prism;
+    prism.min_z = 0.0f;
+    prism.max_z = 1.0f;
+    prism.hull = {{2.0f, 3.0f}, {2.0f, 3.0f}};  // one point, twice
+
+    const ConvexPrism padded = padConvexPrism(prism, 0.1f);
+    EXPECT_TRUE(insideConvexPrism({2.05f, 3.05f, 0.5f}, padded));
+    EXPECT_FALSE(insideConvexPrism({2.3f, 3.0f, 0.5f}, padded));
+}
+
 // =============================================================================
 // transformConvexPrism
 // =============================================================================
@@ -272,6 +336,38 @@ TEST(TransformConvexPrism, RotationAboutZ90) {
     }
     EXPECT_NEAR(transformed.min_z, prism.min_z, 1e-5f);
     EXPECT_NEAR(transformed.max_z, prism.max_z, 1e-5f);
+}
+
+// A prism laid on its side is not a prism, so what comes back has to CONTAIN the tilted
+// volume rather than approximate it. Taking only the bottom ring -- which is what a yaw-only
+// implementation amounts to -- leaves wherever the top ring swung out to unfiltered, which is
+// a hole rather than an approximation.
+TEST(TransformConvexPrism, TiltContainsEveryTransformedCorner) {
+    auto prism = makeSquarePrism();  // unit square footprint, z in [0, 1]
+    Eigen::Isometry3f T = Eigen::Isometry3f::Identity();
+    T.linear() = Eigen::AngleAxisf(static_cast<float>(M_PI / 4.0), Eigen::Vector3f::UnitY())
+                     .toRotationMatrix();
+    auto transformed = transformConvexPrism(prism, T);
+
+    for (const auto& v : prism.hull) {
+        for (float z : {prism.min_z, prism.max_z}) {
+            const Eigen::Vector3f corner = T * Eigen::Vector3f(v.x(), v.y(), z);
+            EXPECT_TRUE(insideConvexPrism(corner, transformed, 1e-4f))
+                << "corner (" << corner.x() << ", " << corner.y() << ", " << corner.z()
+                << ") fell outside the transformed prism";
+        }
+    }
+}
+
+TEST(TransformConvexPrism, TiltGrowsTheZExtent) {
+    auto prism = makeSquarePrism();
+    Eigen::Isometry3f T = Eigen::Isometry3f::Identity();
+    T.linear() = Eigen::AngleAxisf(static_cast<float>(M_PI / 2.0), Eigen::Vector3f::UnitY())
+                     .toRotationMatrix();
+    auto transformed = transformConvexPrism(prism, T);
+
+    // Laid flat, what was the footprint's width becomes the height.
+    EXPECT_GT(transformed.max_z - transformed.min_z, 0.9f);
 }
 
 // =============================================================================
