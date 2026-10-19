@@ -20,6 +20,10 @@
   <depend>tf2</depend>
   <depend>tf2_msgs</depend>
   <depend>tf2_ros</depend>
+  <depend>tf2_eigen</depend>
+  <depend>urdf</depend>
+  <depend>resource_retriever</depend>
+  <depend>libassimp-dev</depend>
   <depend>visualization_msgs</depend>
 
   <test_depend>ament_cmake_cpplint</test_depend>

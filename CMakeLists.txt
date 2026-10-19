@@ -14,6 +14,10 @@ find_package(tf2 REQUIRED)
 find_package(tf2_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(visualization_msgs REQUIRED)
+find_package(tf2_eigen REQUIRED)
+find_package(urdf REQUIRED)
+find_package(resource_retriever REQUIRED)
+find_package(assimp REQUIRED)
 
 # -----------------------------------------------------------------------------
 # Core header-only library
@@ -125,9 +129,11 @@ add_library(hatchbed_common_pointcloud SHARED
   src/pointcloud/components/crop_box.cpp
   src/pointcloud/components/crop_radius.cpp
   src/pointcloud/components/merge_point_clouds.cpp
+  src/pointcloud/components/self_filter.cpp
   src/pointcloud/convex_hull_2d.cpp
   src/pointcloud/point_cloud2_util.cpp
-  src/pointcloud/convex_prism.cpp)
+  src/pointcloud/convex_prism.cpp
+  src/pointcloud/self_shapes.cpp)
 set_target_properties(hatchbed_common_pointcloud PROPERTIES EXPORT_NAME pointcloud)
 target_link_libraries(hatchbed_common_pointcloud PUBLIC
   hatchbed_common
@@ -136,8 +142,13 @@ target_link_libraries(hatchbed_common_pointcloud PUBLIC
   ${rclcpp_components_TARGETS}
   ${sensor_msgs_TARGETS}
   tf2::tf2
+  tf2_eigen::tf2_eigen
   tf2_ros::tf2_ros
-  ${visualization_msgs_TARGETS})
+  ${std_msgs_TARGETS}
+  ${urdf_TARGETS}
+  ${visualization_msgs_TARGETS}
+  assimp::assimp
+  resource_retriever::resource_retriever)
 add_library(hatchbed_common::pointcloud ALIAS hatchbed_common_pointcloud)
 
 rclcpp_components_register_node(hatchbed_common_pointcloud
@@ -151,6 +162,10 @@ rclcpp_components_register_node(hatchbed_common_pointcloud
 rclcpp_components_register_node(hatchbed_common_pointcloud
   PLUGIN "hatchbed_common::pointcloud::MergePointClouds"
   EXECUTABLE merge_point_clouds)
+
+rclcpp_components_register_node(hatchbed_common_pointcloud
+  PLUGIN "hatchbed_common::pointcloud::SelfFilter"
+  EXECUTABLE self_filter)
 
 # -----------------------------------------------------------------------------
 # Example
@@ -193,16 +208,20 @@ install(DIRECTORY include/
 ament_export_targets(hatchbed_commonTargets HAS_LIBRARY_TARGET)
 ament_export_dependencies(
   Eigen3
+  assimp
   fmt
   geometry_msgs
   nav_msgs
   rclcpp
   rclcpp_components
+  resource_retriever
   sensor_msgs
   std_msgs
   tf2
+  tf2_eigen
   tf2_msgs
   tf2_ros
+  urdf
   visualization_msgs)
 
 # -----------------------------------------------------------------------------
@@ -241,6 +260,9 @@ if(BUILD_TESTING)
 
   ament_add_gtest(test_convex_prism test/pointcloud/test_convex_prism.cpp)
   target_link_libraries(test_convex_prism hatchbed_common_pointcloud)
+
+  ament_add_gtest(test_self_shapes test/pointcloud/test_self_shapes.cpp)
+  target_link_libraries(test_self_shapes hatchbed_common_pointcloud)
 
   ament_add_gtest(test_logging test/logging/test_logging.cpp)
   target_link_libraries(test_logging hatchbed_common_logging)
